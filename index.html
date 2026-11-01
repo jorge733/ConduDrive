@@ -20,14 +20,25 @@
 
   <!-- ===== HUD: información sobre la pantalla ===== -->
   <div id="hud">
-    <div id="velocimetro"><span id="velocidad">0</span><small>km/h</small></div>
+    <div id="tablero">
+      <div id="velocimetro"><span id="velocidad">0</span><small>km/h</small></div>
+      <div id="marcha">D1</div>
+      <div id="rpm"><div id="rpm-barra"></div></div>
+      <div id="testigos">
+        <span id="t-abs" title="ABS frenando">ABS</span>
+        <span id="t-esc" title="Control de estabilidad">ESC</span>
+        <span id="t-fm" title="Freno de mano">(P)</span>
+      </div>
+    </div>
+    <div id="limite" title="Velocidad máxima"><span id="limite-num">50</span></div>
     <div id="indicadores">
       <span id="ind-izq" class="flecha">◀</span>
       <span id="ind-der" class="flecha">▶</span>
     </div>
+    <canvas id="minimapa"></canvas>
     <div id="aviso"></div>
     <div id="ayuda-teclado">
-      Flechas/WASD: manejar · Espacio: freno de mano · Q/E: intermitentes · C: cámara
+      Flechas/WASD: manejar · Espacio: freno de mano · Q/E: intermitentes · C: cámara · B: mirar atrás · R: reubicar · P: pausa
     </div>
   </div>
 
@@ -38,20 +49,65 @@
       <button class="boton chico" data-toque="intIzq">⬅</button>
       <button class="boton chico" data-toque="intDer">➡</button>
     </div>
-    <!-- Arriba a la derecha: cámara -->
+    <!-- Arriba a la derecha: cámara y pausa -->
     <div class="grupo arriba-der">
       <button class="boton chico" data-toque="camara">🎥</button>
+      <button class="boton chico" data-toque="pausa">⏸</button>
     </div>
-    <!-- Abajo a la izquierda: girar -->
+    <!-- Abajo a la izquierda: volante (arrastra el dedo para girar) -->
     <div class="grupo abajo-izq">
-      <button class="boton grande" data-mantener="izquierda">◀</button>
-      <button class="boton grande" data-mantener="derecha">▶</button>
+      <div id="volante-tactil" class="boton">
+        <svg class="aro" viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" stroke-width="9"/>
+          <path d="M8 52 Q50 40 92 52" fill="none" stroke="currentColor" stroke-width="8"/>
+          <path d="M50 48 L50 92" stroke="currentColor" stroke-width="8"/>
+          <circle cx="50" cy="50" r="10" fill="#e63946"/>
+          <rect x="46" y="4" width="8" height="10" fill="#ffb300"/>
+        </svg>
+      </div>
     </div>
-    <!-- Abajo a la derecha: pedales -->
+    <!-- Abajo a la derecha: pedales (más arriba = más fuerza) y cambios -->
     <div class="grupo abajo-der">
+      <div class="columna-cambios">
+        <button class="boton chico cambio" data-toque="subirMarcha">▲</button>
+        <button class="boton chico cambio" data-toque="bajarMarcha">▼</button>
+      </div>
       <button class="boton mediano freno-mano" data-mantener="frenoMano">FRENO<br>MANO</button>
-      <button class="boton pedal freno" data-mantener="frenar">FRENO<br><small>/ atrás</small></button>
-      <button class="boton pedal acelerador" data-mantener="acelerar">ACELERAR</button>
+      <button class="boton pedal freno" data-pedal="freno">FRENO<br><small>/ atrás</small></button>
+      <button class="boton pedal acelerador" data-pedal="acelerador">ACELERAR<br><small>↑ más</small></button>
+    </div>
+  </div>
+
+  <!-- ===== Menú de pausa ===== -->
+  <div id="pausa">
+    <div class="panel">
+      <h1>ConduDrive</h1>
+      <p class="sub">Pausa</p>
+      <button id="btn-continuar" class="opcion principal">▶ Continuar</button>
+      <div class="opciones">
+        <button class="opcion" data-opcion="caja">Caja: <b>Automática</b></button>
+        <button class="opcion" data-opcion="lluvia">Clima: <b>Despejado</b></button>
+        <button class="opcion" data-opcion="esc">Control de estabilidad: <b>Sí</b></button>
+        <button class="opcion" data-opcion="sonido">Sonido: <b>Sí</b></button>
+        <button class="opcion" data-opcion="reiniciar">↺ Volver a la calle más cercana</button>
+        <button class="opcion" data-opcion="inicio">⌂ Volver al estacionamiento</button>
+      </div>
+      <details>
+        <summary>Controles</summary>
+        <table>
+          <tr><th></th><th>Teclado</th><th>Control (gamepad)</th></tr>
+          <tr><td>Acelerar / frenar</td><td>↑ ↓ o W S</td><td>RT / LT</td></tr>
+          <tr><td>Girar</td><td>← → o A D</td><td>Stick izquierdo</td></tr>
+          <tr><td>Freno de mano</td><td>Espacio</td><td>A</td></tr>
+          <tr><td>Reversa</td><td colspan="2">Detenido: suelta y vuelve a mantener el freno</td></tr>
+          <tr><td>Cambios (manual)</td><td>X / Z (o Shift / Ctrl)</td><td>B / X</td></tr>
+          <tr><td>Intermitentes</td><td>Q / E</td><td>LB / RB</td></tr>
+          <tr><td>Cámara · mirar atrás</td><td>C · B</td><td>Y</td></tr>
+          <tr><td>Caja · lluvia · sonido</td><td>T · L · M</td><td></td></tr>
+          <tr><td>Reubicar · pausa</td><td>R · P</td><td>Back · Start</td></tr>
+        </table>
+        <p class="nota">En celular: gira el volante arrastrando el dedo. En los pedales, mientras más arriba aprietes, más fuerte.</p>
+      </details>
     </div>
   </div>
 

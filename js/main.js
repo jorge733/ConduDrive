@@ -13,6 +13,11 @@ import { resolverColisiones } from './colisiones.js';
 import { Trafico } from './trafico.js';
 import { Peatones } from './peatones.js';
 import { Interior } from './interior.js';
+import { Sonido } from './sonido.js';
+import { MarcasNeumaticos } from './marcas.js';
+import { Lluvia } from './lluvia.js';
+import { Minimapa } from './minimapa.js';
+import { CALLES, ROTONDA } from './ciudad.js';
 
 // ---------- Renderizador (el "pintor" que dibuja la escena) ----------
 const contenedor = document.getElementById('juego');
@@ -61,12 +66,25 @@ const peatones = new Peatones(escena);
 const controles = new Controles();
 const controlCamara = new ControlCamara(camara);
 controlCamara.alCambiar = (modo) => interior.modoInterior(modo === 'interior');
+const sonido = new Sonido();
+const marcas = new MarcasNeumaticos(escena);
+const lluvia = new Lluvia(escena, { cielo: luzCielo, sol });
+const minimapa = new Minimapa(document.getElementById('minimapa'));
+auto.alCambiarMarcha = () => sonido.cambio();
+auto.alParpadear = (on) => sonido.tic(on);
 
 // ---------- HUD (textos en pantalla) ----------
-const elVelocidad = document.getElementById('velocidad');
-const elIndIzq = document.getElementById('ind-izq');
-const elIndDer = document.getElementById('ind-der');
-const elAviso = document.getElementById('aviso');
+const $ = (id) => document.getElementById(id);
+const elVelocidad = $('velocidad');
+const elVelocimetro = $('velocimetro');
+const elMarcha = $('marcha');
+const elRpm = $('rpm-barra');
+const elAbs = $('t-abs'), elEsc = $('t-esc'), elFm = $('t-fm');
+const elLimite = $('limite'), elLimiteNum = $('limite-num');
+const elIndIzq = $('ind-izq');
+const elIndDer = $('ind-der');
+const elAviso = $('aviso');
+const elPausa = $('pausa');
 const btnIntIzq = document.querySelector('[data-toque="intIzq"]');
 const btnIntDer = document.querySelector('[data-toque="intDer"]');
 let temporizadorAviso = null;
@@ -78,13 +96,140 @@ function mostrarAviso(texto, ms = 1200) {
   temporizadorAviso = setTimeout(() => elAviso.classList.remove('visible'), ms);
 }
 
+// ---------- Opciones (se recuerdan entre partidas) ----------
+const opciones = { cajaManual: false, lluvia: false, esc: true, sonido: true };
+try { Object.assign(opciones, JSON.parse(localStorage.getItem('condudrive-opciones') || '{}')); } catch (e) { /* sin almacenamiento */ }
+function guardarOpciones() {
+  try { localStorage.setItem('condudrive-opciones', JSON.stringify(opciones)); } catch (e) { /* sin almacenamiento */ }
+}
+function aplicarOpciones() {
+  auto.ponerCajaManual(opciones.cajaManual);
+  auto.lluvia = opciones.lluvia;
+  auto.esc = opciones.esc;
+  lluvia.poner(opciones.lluvia);
+  if (sonido.activo !== opciones.sonido) sonido.alternar();
+  document.body.classList.toggle('caja-manual', opciones.cajaManual);
+  const txt = {
+    caja: opciones.cajaManual ? 'Manual' : 'Automática',
+    lluvia: opciones.lluvia ? 'Lluvia' : 'Despejado',
+    esc: opciones.esc ? 'Sí' : 'No',
+    sonido: opciones.sonido ? 'Sí' : 'No'
+  };
+  for (const [k, v] of Object.entries(txt)) {
+    const b = document.querySelector(`[data-opcion="${k}"] b`);
+    if (b) b.textContent = v;
+  }
+  guardarOpciones();
+}
+
+// ---------- Pausa ----------
+let pausado = false;
+function ponerPausa(p) {
+  pausado = p;
+  elPausa.classList.toggle('visible', p);
+  controles.soltarTodo();
+}
+
+// ---------- Reubicar el auto ----------
+const MEDIA_PISTA = CONFIG.ciudad.anchoCalle / 4;
+/** Deja el auto en la pista derecha de la calle más cercana, mirando en su dirección */
+function reubicar() {
+  const p = auto.posicion;
+  let mejor = null;
+  for (const c of CALLES) {
+    const dx = Math.abs(p.x - c), dz = Math.abs(p.z - c);
+    if (!mejor || dx < mejor.d) mejor = { d: dx, eje: 'x', c };
+    if (dz < mejor.d) mejor = { d: dz, eje: 'z', c };
+  }
+  let angulo;
+  if (mejor.eje === 'x') { // calle que corre a lo largo de Z
+    angulo = Math.cos(auto.angulo) >= 0 ? 0 : Math.PI;
+    p.x = mejor.c; p.z = THREE.MathUtils.clamp(p.z, -95, 95);
+  } else {
+    angulo = Math.sin(auto.angulo) >= 0 ? Math.PI / 2 : -Math.PI / 2;
+    p.z = mejor.c; p.x = THREE.MathUtils.clamp(p.x, -95, 95);
+  }
+  // Fuera de la rotonda
+  const dr = Math.hypot(p.x - ROTONDA.x, p.z - ROTONDA.z);
+  if (dr < ROTONDA.radio + 4) {
+    const fx = Math.sin(angulo), fz = Math.cos(angulo);
+    p.x -= fx * (ROTONDA.radio + 6); p.z -= fz * (ROTONDA.radio + 6);
+  }
+  // Pista derecha (en Chile se maneja por la derecha)
+  p.x += -Math.cos(angulo) * MEDIA_PISTA;
+  p.z += Math.sin(angulo) * MEDIA_PISTA;
+  auto.angulo = angulo;
+  auto.detener();
+  marcas.cortar();
+  controlCamara._primerCuadro = true;
+  mostrarAviso('Auto reubicado', 900);
+}
+function volverAlInicio() {
+  auto.posicion.set(PUNTOS.inicio.x, 0, PUNTOS.inicio.z);
+  auto.angulo = PUNTOS.inicio.angulo;
+  auto.detener();
+  marcas.cortar();
+  controlCamara._primerCuadro = true;
+}
+
 // Acciones de un toque
+controles.on('interaccion', () => sonido.iniciar());
 controles.on('intIzq', () => auto.alternarIntermitente('izq'));
 controles.on('intDer', () => auto.alternarIntermitente('der'));
 controles.on('camara', () => {
   controlCamara.siguiente();
   mostrarAviso(controlCamara.nombre, 800);
 });
+controles.on('pausa', () => ponerPausa(!pausado));
+controles.on('reiniciar', () => { if (!pausado) reubicar(); });
+controles.on('caja', () => {
+  opciones.cajaManual = !opciones.cajaManual;
+  aplicarOpciones();
+  mostrarAviso(opciones.cajaManual ? 'Caja manual (X/Z cambian)' : 'Caja automática', 1200);
+});
+controles.on('subirMarcha', () => {
+  if (!auto.cajaManual) return;
+  const err = auto.cambiarMarcha(+1);
+  if (err) mostrarAviso(err, 1000);
+});
+controles.on('bajarMarcha', () => {
+  if (!auto.cajaManual) return;
+  const err = auto.cambiarMarcha(-1);
+  if (err) mostrarAviso(err, 1000);
+});
+controles.on('lluvia', () => {
+  opciones.lluvia = !opciones.lluvia;
+  aplicarOpciones();
+  mostrarAviso(opciones.lluvia ? '🌧 Lluvia: ¡menos agarre!' : '☀ Despejado', 1200);
+});
+controles.on('sonido', () => {
+  opciones.sonido = !opciones.sonido;
+  aplicarOpciones();
+  mostrarAviso(opciones.sonido ? '🔊 Sonido' : '🔇 Sin sonido', 800);
+});
+controles.on('gamepad', () => mostrarAviso('🎮 Control conectado', 1500));
+
+$('btn-continuar').addEventListener('click', () => ponerPausa(false));
+document.querySelectorAll('[data-opcion]').forEach((b) => b.addEventListener('click', () => {
+  const o = b.dataset.opcion;
+  if (o === 'caja') opciones.cajaManual = !opciones.cajaManual;
+  if (o === 'lluvia') opciones.lluvia = !opciones.lluvia;
+  if (o === 'esc') opciones.esc = !opciones.esc;
+  if (o === 'sonido') { opciones.sonido = !opciones.sonido; sonido.iniciar(); }
+  if (o === 'reiniciar') { reubicar(); ponerPausa(false); }
+  if (o === 'inicio') { volverAlInicio(); ponerPausa(false); }
+  aplicarOpciones();
+}));
+aplicarOpciones();
+
+// ---------- Límite de velocidad según la zona ----------
+function limiteEn(x, z) {
+  const L = CONFIG.limites, ze = PUNTOS.zonaEscolar;
+  if (Math.abs(x + 50) < 20 && Math.abs(z + 50) < 20) return L.estacionamiento;
+  if (Math.abs(z - ze.z) < 6 && x < ze.desdeX + 4 && x > ze.hastaX - 4) return L.zonaEscolar;
+  return L.urbano;
+}
+let tiempoExceso = 0, avisoExcesoDado = false;
 
 // ---------- Ajustar al tamaño de la pantalla ----------
 function alCambiarTamano() {
@@ -96,7 +241,7 @@ window.addEventListener('resize', alCambiarTamano);
 window.addEventListener('orientationchange', () => setTimeout(alCambiarTamano, 300));
 
 // Acceso para pruebas desde la consola del navegador
-window.ConduDrive = { renderer, escena, auto, semaforo, trafico, peatones, barreras };
+window.ConduDrive = { renderer, escena, auto, semaforo, trafico, peatones, barreras, controles, reubicar };
 
 // ---------- Bucle del juego ----------
 const reloj = new THREE.Clock();
@@ -108,35 +253,63 @@ function bucle() {
   // dt = tiempo desde el cuadro anterior (limitado por si el celular se traba)
   const dt = Math.min(reloj.getDelta(), 0.05);
 
-  // 1) El pueblo se mueve: semáforo, autos y peatones
-  semaforo.actualizar(dt);
-  trafico.actualizar(dt, auto);
-  peatones.actualizar(dt);
-  barreras.actualizar(dt, auto);
+  if (!pausado) {
+    // 1) El pueblo se mueve: semáforo, autos y peatones
+    semaforo.actualizar(dt);
+    trafico.actualizar(dt, auto);
+    peatones.actualizar(dt);
+    barreras.actualizar(dt, auto);
 
-  // 2) Física del auto del jugador
-  auto.actualizar(dt, controles);
+    // 2) Física del auto del jugador
+    auto.actualizar(dt, controles);
 
-  // 3) Choques (con lo fijo y con lo que se mueve)
-  mundo.dinamicos.length = 0;
-  trafico.agregarColisiones(mundo.dinamicos);
-  peatones.agregarColisiones(mundo.dinamicos);
-  mundo.cajasDinamicas.length = 0;
-  barreras.agregarColisiones(mundo.cajasDinamicas);
-  const choque = resolverColisiones(auto, mundo);
-  auto.grupo.position.copy(auto.posicion);
-  const ahora = performance.now();
-  if (choque && choque.tipo === 'peaton') peatones.atropellar();
-  if (choque && (choque.fuerza > 2 || choque.tipo === 'peaton') && ahora - ultimoChoque > 800) {
-    ultimoChoque = ahora;
-    const textos = { auto: '¡PUM! Chocaste un auto', peaton: '¡Atropellaste a alguien!', vereda: '¡Uy! Te subiste a la vereda', barrera: '¡Chocaste la barrera!' };
-    mostrarAviso(textos[choque.tipo] || '¡Choque!');
+    // 3) Choques (con lo fijo y con lo que se mueve)
+    mundo.dinamicos.length = 0;
+    trafico.agregarColisiones(mundo.dinamicos);
+    peatones.agregarColisiones(mundo.dinamicos);
+    mundo.cajasDinamicas.length = 0;
+    barreras.agregarColisiones(mundo.cajasDinamicas);
+    const choque = resolverColisiones(auto, mundo);
+    auto.grupo.position.copy(auto.posicion);
+    const ahora = performance.now();
+    if (choque && choque.tipo === 'peaton') peatones.atropellar();
+    if (choque && choque.fuerza > 1.2 && ahora - ultimoChoque > 250) {
+      sonido.golpe(choque.fuerza);
+      controlCamara.sacudir(choque.fuerza);
+    }
+    if (choque && (choque.fuerza > 2 || choque.tipo === 'peaton') && ahora - ultimoChoque > 800) {
+      ultimoChoque = ahora;
+      const textos = { auto: '¡PUM! Chocaste un auto', peaton: '¡Atropellaste a alguien!', vereda: '¡Uy! Te subiste a la vereda', barrera: '¡Chocaste la barrera!' };
+      mostrarAviso(textos[choque.tipo] || '¡Choque!');
+    }
+    marcas.actualizar(auto);
+
+    // Límite de velocidad
+    const limite = limiteEn(auto.posicion.x, auto.posicion.z);
+    if (elLimiteNum.textContent !== String(limite)) elLimiteNum.textContent = limite;
+    const excede = auto.kmh > limite + 3;
+    tiempoExceso = excede ? tiempoExceso + dt : 0;
+    if (tiempoExceso > 1.2 && !avisoExcesoDado) {
+      avisoExcesoDado = true;
+      mostrarAviso(`¡Exceso de velocidad! Máximo ${limite} km/h`, 1600);
+      sonido.pitido();
+    }
+    if (!excede && auto.kmh < limite) avisoExcesoDado = false;
+    elVelocimetro.classList.toggle('exceso', excede);
+    elLimite.classList.toggle('alerta', tiempoExceso > 0.5);
+  } else {
+    controles.leer(dt); // sigue leyendo el gamepad (para el botón Start)
   }
 
   // 4) Cámara y sol siguen al auto
+  const atras = !!controles.mirandoAtras;
+  if (atras !== controlCamara.mirarAtras) { controlCamara.mirarAtras = atras; controlCamara._primerCuadro = true; }
   controlCamara.actualizar(dt, auto);
   sol.position.copy(auto.posicion).add(desfaseSol);
   sol.target.position.copy(auto.posicion);
+  lluvia.actualizar(pausado ? 0 : dt, camara, auto.velocidad.x, auto.velocidad.y);
+  sonido.actualizar(auto, opciones.lluvia, pausado);
+  minimapa.actualizar(dt, auto, trafico);
 
   // 5) HUD
   const kmh = Math.round(auto.kmh);
@@ -144,6 +317,12 @@ function bucle() {
     elVelocidad.textContent = kmh;
     ultimaVelocidadMostrada = kmh;
   }
+  const marcha = auto.textoMarcha;
+  if (elMarcha.textContent !== marcha) elMarcha.textContent = marcha;
+  elRpm.style.width = Math.min(100, (auto.rpm / 7000) * 100).toFixed(1) + '%';
+  elAbs.classList.toggle('on', auto.absActivo && auto.kmh > 5);
+  elEsc.classList.toggle('on', auto.escActivo || !auto.esc);
+  elFm.classList.toggle('on', controles.salida.frenoMano);
   const izqOn = auto.intermitente === 'izq', derOn = auto.intermitente === 'der';
   elIndIzq.classList.toggle('encendida', izqOn && auto.intermitenteEncendido);
   elIndDer.classList.toggle('encendida', derOn && auto.intermitenteEncendido);

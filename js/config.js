@@ -7,20 +7,47 @@
 
 export const CONFIG = {
   auto: {
-    velocidadMax: 22,          // ~80 km/h
-    velocidadMaxReversa: 4.5,  // ~16 km/h (marcha atrás más lenta)
-    aceleracion: 5.0,          // qué tan rápido gana velocidad
-    aceleracionReversa: 2.5,
-    frenado: 11,               // fuerza del freno normal
-    frenoMano: 7,              // fuerza del freno de mano
-    rozamiento: 1.3,           // frenado suave cuando sueltas el acelerador
-    distanciaEjes: 2.5,        // distancia entre ruedas delanteras y traseras
-    giroMax: 0.6,              // ángulo máximo de las ruedas (radianes, ~34°)
-    velocidadVolante: 2.8,     // qué tan rápido se mueve el volante
-    agarre: 10,                // agarre normal de los neumáticos
-    agarreLluvia: 3.5,         // agarre con lluvia (se usará en el modo pesadilla)
-    agarreFrenoMano: 1.6,      // con freno de mano el auto "patina"
-    radioRueda: 0.32,
+    // ----- Cuerpo (un auto chico tipo hatchback, tracción delantera) -----
+    masa: 1200,                // kg
+    inercia: 1850,             // resistencia a girar sobre sí mismo (kg·m²)
+    cgDelante: 1.12,           // metros del centro de masa al eje delantero
+    cgAtras: 1.38,             // metros del centro de masa al eje trasero
+    alturaCG: 0.52,            // altura del centro de masa (traspaso de peso)
+    radioRueda: 0.31,
+
+    // ----- Neumáticos (curva tipo "Pacejka" simplificada) -----
+    agarre: 1.0,               // coeficiente de roce con asfalto seco
+    agarreLluvia: 0.6,         // con asfalto mojado
+    rigidezNeumatico: 16,      // qué tan rápido responde el neumático (B)
+    formaNeumatico: 1.45,      // forma de la curva (C): pasado el máximo, pierde agarre
+
+    // ----- Motor (1.4 litros, ~75 kW) -----
+    rpmRalenti: 850,
+    rpmMax: 6300,              // corte de inyección
+    torqueMax: 140,            // N·m
+    rpmTorqueMax: 4000,
+    frenoMotor: 0.006,         // retención del motor al soltar el acelerador
+    torqueArrastre: 24,        // empuje suave de la caja automática en ralentí ("creep")
+
+    // ----- Caja de cambios -----
+    cambios: [3.45, 2.05, 1.38, 1.03, 0.82],
+    reversa: 3.3,
+    diferencial: 4.06,
+    eficiencia: 0.9,
+
+    // ----- Frenos y resistencia del aire -----
+    frenoMax: 11500,           // fuerza total máxima de los frenos (N)
+    repartoFreno: 0.68,        // parte del frenado que hacen las ruedas delanteras
+    arrastreAire: 0.42,        // ½·densidad·Cd·área
+    rodadura: 0.013,           // resistencia a la rodadura
+
+    // ----- Dirección -----
+    distanciaEjes: 2.5,
+    giroMax: 0.62,             // ángulo máximo de las ruedas (~35°)
+    relacionVolante: 13,       // vueltas del volante vs. ruedas
+    sensibilidadTeclado: 55,   // a más número, menos se reduce el giro con la velocidad (teclado)
+    sensibilidadAnalogica: 160,// lo mismo para volante táctil o joystick (más preciso)
+
     radioChoque: 0.85          // tamaño del auto para detectar choques
   },
 
@@ -36,6 +63,13 @@ export const CONFIG = {
     verde: 9,                  // segundos en verde
     amarillo: 3,               // segundos en amarillo
     todoRojo: 1.5              // segundos con todos en rojo (por seguridad)
+  },
+
+  // Límites de velocidad (km/h), como en Chile
+  limites: {
+    urbano: 50,
+    zonaEscolar: 30,
+    estacionamiento: 20
   },
 
   trafico: {

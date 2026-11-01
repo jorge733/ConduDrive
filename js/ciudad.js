@@ -67,6 +67,7 @@ export function crearCiudad(escena) {
   );
   piso.rotation.x = -Math.PI / 2;
   piso.receiveShadow = true;
+  piso.name = 'piso'; // se vuelve brillante cuando llueve (asfalto mojado)
   escena.add(piso);
 
   // ---------- Ayudantes ----------

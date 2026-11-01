@@ -41,32 +41,38 @@ export class Interior {
     caja(g, mat(0x1c1d20), 0.3, 0.12, 0.05, -0.05, 0.95, 0.38);        // radio
     caja(g, mat(0x88d1ff, { emissive: 0x2288cc, emissiveIntensity: 0.6 }), 0.22, 0.07, 0.01, -0.05, 0.96, 0.355);
 
-    // ----- Velocímetro: esfera dibujada + aguja -----
-    const texDial = texturaCanvas(256, 256, (ctx, w) => {
+    // ----- Velocímetro y cuentarrevoluciones: esferas dibujadas + agujas -----
+    const dibujarDial = (maximo, paso, rojoDesde, etiqueta, divisor = 1) => texturaCanvas(256, 256, (ctx, w) => {
       const c = w / 2;
       ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(c, c, c - 4, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = '#ddd'; ctx.lineWidth = 6; ctx.stroke();
       ctx.fillStyle = '#fff'; ctx.font = '700 26px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      for (let v = 0; v <= 120; v += 10) {
-        const a = (-120 + (v / 120) * 240) * Math.PI / 180 - Math.PI / 2;
-        const largo = v % 20 === 0 ? 22 : 12;
-        ctx.strokeStyle = v >= 100 ? '#ff4d4d' : '#fff'; ctx.lineWidth = 4;
+      for (let v = 0; v <= maximo; v += paso / 2) {
+        const a = (-120 + (v / maximo) * 240) * Math.PI / 180 - Math.PI / 2;
+        const grande = Math.round(v / paso) * paso === v;
+        const largo = grande ? 22 : 12;
+        ctx.strokeStyle = v >= rojoDesde ? '#ff4d4d' : '#fff'; ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.moveTo(c + Math.cos(a) * (c - 12), c + Math.sin(a) * (c - 12));
         ctx.lineTo(c + Math.cos(a) * (c - 12 - largo), c + Math.sin(a) * (c - 12 - largo));
         ctx.stroke();
-        if (v % 20 === 0) ctx.fillText(v, c + Math.cos(a) * (c - 56), c + Math.sin(a) * (c - 56));
+        if (grande) ctx.fillText(v / divisor, c + Math.cos(a) * (c - 56), c + Math.sin(a) * (c - 56));
       }
-      ctx.font = '700 20px Arial'; ctx.fillText('km/h', c, c + 60);
+      ctx.font = '700 20px Arial'; ctx.fillText(etiqueta, c, c + 60);
     });
-    const dial = new THREE.Mesh(new THREE.CircleGeometry(0.085, 24), new THREE.MeshBasicMaterial({ map: texDial }));
-    dial.position.set(LADO_CONDUCTOR, 1.06, 0.4);
-    dial.rotation.set(-0.25, Math.PI, 0);
-    g.add(dial);
-    this.aguja = new THREE.Group();
-    const aguja = caja(this.aguja, new THREE.MeshBasicMaterial({ color: 0xff3b30 }), 0.006, 0.07, 0.003, 0, 0.03, 0);
-    aguja.position.z = 0.002;
-    dial.add(this.aguja);
+    const crearDial = (tex, radio, x) => {
+      const dial = new THREE.Mesh(new THREE.CircleGeometry(radio, 24), new THREE.MeshBasicMaterial({ map: tex }));
+      dial.position.set(x, 1.06, 0.4);
+      dial.rotation.set(-0.25, Math.PI, 0);
+      g.add(dial);
+      const grupoAguja = new THREE.Group();
+      const aguja = caja(grupoAguja, new THREE.MeshBasicMaterial({ color: 0xff3b30 }), 0.006, radio * 0.82, 0.003, 0, radio * 0.36, 0);
+      aguja.position.z = 0.002;
+      dial.add(grupoAguja);
+      return grupoAguja;
+    };
+    this.aguja = crearDial(dibujarDial(180, 20, 140, 'km/h'), 0.078, LADO_CONDUCTOR + 0.07);
+    this.agujaRpm = crearDial(dibujarDial(7000, 1000, 6000, 'x1000 rpm', 1000), 0.06, LADO_CONDUCTOR - 0.11);
 
     // ----- Volante -----
     const columna = new THREE.Group();
@@ -157,13 +163,15 @@ export class Interior {
   actualizar(dt, renderer, escena) {
     const a = this.auto;
     // Aguja: 0 km/h = -120°, 120 km/h = +120°
-    const kmh = Math.min(a.kmh, 125);
-    this.aguja.rotation.z = THREE.MathUtils.degToRad(120 - (kmh / 120) * 240);
+    const kmh = Math.min(a.kmh, 185);
+    this.aguja.rotation.z = THREE.MathUtils.degToRad(120 - (kmh / 180) * 240);
+    this.agujaRpm.rotation.z = THREE.MathUtils.degToRad(120 - (Math.min(a.rpm, 7000) / 7000) * 240);
     // Volante: gira bastante más que las ruedas (como en la vida real)
-    this.volante.rotation.z = a.giro * 5;
+    this.volante.rotation.z = a.giro * CONFIG.auto.relacionVolante;
     // Las manos del conductor siguen al volante
-    this.conductor.brazos[0].rotation.y = a.giro * 0.8;
-    this.conductor.brazos[1].rotation.y = a.giro * 0.8;
+    const brazos = THREE.MathUtils.clamp(a.giro * 2, -0.6, 0.6);
+    this.conductor.brazos[0].rotation.y = brazos;
+    this.conductor.brazos[1].rotation.y = brazos;
 
     // Los espejos se actualizan solo en la vista interior y cuadro por medio (para ahorrar trabajo)
     if (this.activo && (this._cuadro++ % 2 === 0)) {

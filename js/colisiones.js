@@ -80,10 +80,13 @@ function aplicarEmpuje(auto, nx, nz, empuje, p) {
   if (contraPared >= 0) return null;
 
   // Quitamos la velocidad que va "contra la pared" y rebotamos un poquito
-  v.x -= nx * contraPared * 1.25;
-  v.y -= nz * contraPared * 1.25;
-  // Pierde también algo de velocidad al raspar
-  v.multiplyScalar(0.85);
+  const dvx = -nx * contraPared * 1.25, dvz = -nz * contraPared * 1.25;
+  v.x += dvx;
+  v.y += dvz;
+  // Pierde también algo de velocidad al raspar (más si el golpe es fuerte)
+  v.multiplyScalar(-contraPared > 4 ? 0.75 : 0.9);
+  // Un golpe en la punta o en la cola hace girar el auto
+  if (auto.impulsoChoque) auto.impulsoChoque(p.x - auto.posicion.x, p.z - auto.posicion.z, dvx, dvz);
 
   // Mantener coherente la velocidad hacia adelante del auto
   auto.velocidadAvance = v.x * Math.sin(auto.angulo) + v.y * Math.cos(auto.angulo);

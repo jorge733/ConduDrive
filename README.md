@@ -19,14 +19,37 @@ Luego abre <http://localhost:8000> en el navegador.
 
 ## Controles
 
-| Acción | Computador | Celular |
-|---|---|---|
-| Acelerar | ↑ o W | botón verde ACELERAR |
-| Frenar / marcha atrás | ↓ o S (manteniendo, estando detenido) | botón rojo FRENO |
-| Girar | ← → o A D | botones ◀ ▶ |
-| Freno de mano | Espacio | FRENO MANO |
-| Intermitentes | Q / E | ⬅ ➡ arriba a la izquierda |
-| Cambiar cámara | C | 🎥 |
+| Acción | Computador | Celular | Control (gamepad) |
+|---|---|---|---|
+| Acelerar | ↑ o W (se pisa de a poco) | pedal verde (más arriba = más fuerte) | RT |
+| Frenar | ↓ o S | pedal rojo | LT |
+| Marcha atrás | detenido: suelta y vuelve a mantener ↓ | igual, con el pedal rojo | igual, con LT |
+| Girar | ← → o A D | arrastra el volante | stick izquierdo |
+| Freno de mano | Espacio | FRENO MANO | A |
+| Intermitentes | Q / E | ⬅ ➡ | LB / RB |
+| Cambiar cámara · mirar atrás | C · B (mantener) | 🎥 | Y |
+| Caja manual: subir / bajar marcha | X / Z (o Shift / Ctrl) | ▲ ▼ | B / X |
+| Caja automática ↔ manual | T | menú ⏸ | — |
+| Lluvia · sonido | L · M | menú ⏸ | — |
+| Reubicar el auto en la calle | R | menú ⏸ | Back |
+| Pausa | P o Esc | ⏸ | Start |
+
+Las opciones del menú de pausa (caja, clima, control de estabilidad, sonido) se recuerdan entre partidas.
+
+## Conducción realista
+
+- **Física de verdad (simplificada)**: masa, inercia, traspaso de peso al frenar/acelerar y
+  neumáticos que se deforman y pueden perder agarre (curva tipo Pacejka). Detenido, el auto no gira.
+- **Motor y caja**: curva de torque, revoluciones, 5 marchas (automática o manual secuencial),
+  freno motor, corte de inyección y "creep" (la automática avanza sola despacito si sueltas el freno).
+- **Frenos con ABS**, freno de mano que bloquea las ruedas traseras (el auto puede cruzarse),
+  **control de estabilidad y tracción** (se puede apagar) y resistencia del aire.
+- **Lluvia**: el asfalto se moja y brilla, hay menos agarre y frenar toma más distancia.
+- **Sonido sintetizado**: motor según las revoluciones, chirrido de neumáticos, viento, choques e intermitente.
+- **Marcas de neumáticos** en el asfalto al derrapar o frenar con las ruedas bloqueadas.
+- La carrocería se inclina sobre sus resortes; en la vista interior la cabeza se mueve con las fuerzas G.
+- **HUD**: velocidad, marcha, revoluciones, testigos ABS/ESC/freno de mano, **límite de velocidad
+  de la zona** (50 urbano, 30 zona escolar, 20 estacionamiento) con aviso de exceso y **minimapa**.
 
 ## El pueblo
 
@@ -55,9 +78,13 @@ Luego abre <http://localhost:8000> en el navegador.
 | `css/estilos.css` | Colores y posición de los textos y botones |
 | `js/main.js` | Arma todo y ejecuta el bucle del juego |
 | `js/config.js` | **Números ajustables** (velocidad, agarre, semáforo, tránsito, calidad...) |
-| `js/auto.js` | Modelo 3D del auto del jugador y su física |
+| `js/auto.js` | Modelo 3D del auto del jugador, su física, motor y caja de cambios |
+| `js/sonido.js` | Sonidos sintetizados (motor, neumáticos, viento, golpes) |
+| `js/marcas.js` | Marcas de neumáticos en el asfalto |
+| `js/lluvia.js` | Lluvia y asfalto mojado |
+| `js/minimapa.js` | Minimapa que gira con el auto |
 | `js/interior.js` | Tablero, volante, velocímetro, asientos y espejos retrovisores |
-| `js/controles.js` | Teclado y botones táctiles |
+| `js/controles.js` | Teclado, volante y pedales táctiles, y gamepad |
 | `js/camara.js` | Las tres cámaras |
 | `js/colisiones.js` | Choques |
 | `js/ciudad.js` | El pueblo: calles, casas, plaza, colegio, rotonda, señales |

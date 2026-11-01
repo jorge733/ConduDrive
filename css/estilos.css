@@ -28,24 +28,96 @@ html, body {
 /* ---------- HUD ---------- */
 #hud { position: fixed; inset: 0; pointer-events: none; }
 
-#velocimetro {
+#tablero {
   position: absolute;
   top: max(12px, env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
   background: rgba(15, 25, 40, 0.55);
   border-radius: 14px;
-  padding: 6px 16px;
+  padding: 6px 14px 8px;
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 12px;
+  align-items: center;
+  min-width: 150px;
+}
+#velocimetro {
   font-size: 30px;
   font-weight: 800;
-  text-align: center;
-  min-width: 110px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  min-width: 92px;
 }
 #velocimetro small { font-size: 13px; font-weight: 600; margin-left: 4px; opacity: 0.8; }
+#velocimetro.exceso { color: #ff5252; }
+#marcha {
+  font-size: 24px;
+  font-weight: 900;
+  color: #8fd3ff;
+  min-width: 34px;
+  text-align: center;
+}
+#rpm {
+  grid-column: 1 / 3;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+  margin-top: 3px;
+}
+#rpm-barra {
+  height: 100%;
+  width: 10%;
+  background: linear-gradient(90deg, #4caf50 0%, #ffeb3b 70%, #ff3d00 90%);
+  background-size: 160px 100%;
+}
+#testigos {
+  grid-column: 1 / 3;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  margin-top: 4px;
+}
+#testigos span { color: rgba(255, 255, 255, 0.15); }
+#testigos span.on { color: #ffb300; }
+#testigos #t-fm.on { color: #ff5252; }
+
+#limite {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: calc(50% + 100px);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #fff;
+  border: 6px solid #d32f2f;
+  color: #111;
+  font-weight: 900;
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+#limite.alerta { animation: parpadeo 0.5s infinite alternate; }
+@keyframes parpadeo { to { transform: scale(1.15); background: #ffcdd2; } }
+
+#minimapa {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  opacity: 0.92;
+}
 
 #indicadores {
   position: absolute;
-  top: calc(max(12px, env(safe-area-inset-top)) + 58px);
+  top: calc(max(12px, env(safe-area-inset-top)) + 84px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -88,7 +160,7 @@ body.tactil #ayuda-teclado { display: none; }
 
 .grupo { position: absolute; display: flex; gap: 12px; align-items: flex-end; }
 .arriba-izq { top: max(12px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); }
-.arriba-der { top: max(12px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); }
+.arriba-der { top: calc(max(12px, env(safe-area-inset-top)) + 150px); right: max(16px, env(safe-area-inset-right)); }
 .abajo-izq  { bottom: max(16px, env(safe-area-inset-bottom)); left: max(16px, env(safe-area-inset-left)); gap: 16px; }
 .abajo-der  { bottom: max(16px, env(safe-area-inset-bottom)); right: max(16px, env(safe-area-inset-right)); }
 
@@ -110,10 +182,69 @@ body.tactil #ayuda-teclado { display: none; }
 .boton.chico   { width: 54px;  height: 54px;  font-size: 22px; }
 .boton.grande  { width: 96px;  height: 96px;  font-size: 38px; }
 .boton.mediano { width: 64px;  height: 64px;  font-size: 11px; align-self: center; }
-.boton.pedal   { border-radius: 18px; font-size: 13px; }
+.boton.pedal   { border-radius: 18px; font-size: 13px; flex-direction: column; }
 .boton.freno      { width: 86px;  height: 86px;  border-color: rgba(255, 120, 120, 0.8); }
 .boton.acelerador { width: 86px;  height: 130px; border-color: rgba(120, 255, 140, 0.8); }
 .boton.intermitente-on { background: rgba(255, 179, 0, 0.7); }
+
+/* Volante táctil */
+#volante-tactil {
+  width: 150px;
+  height: 150px;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 8px;
+}
+#volante-tactil .aro { width: 100%; height: 100%; pointer-events: none; }
+#volante-tactil.activo { transform: none; background: rgba(255, 255, 255, 0.2); }
+
+.columna-cambios { display: none; flex-direction: column; gap: 8px; align-self: center; }
+body.caja-manual .columna-cambios { display: flex; }
+.boton.cambio { border-radius: 12px; width: 48px; height: 44px; font-size: 18px; }
+
+/* Menú de pausa */
+#pausa {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 18, 30, 0.72);
+  z-index: 5;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+#pausa.visible { display: flex; }
+#pausa .panel {
+  background: #1f3247;
+  border-radius: 18px;
+  padding: 22px 24px;
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+#pausa h1 { font-size: 28px; }
+#pausa .sub { opacity: 0.7; margin-bottom: 14px; }
+#pausa .opciones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+#pausa .opcion {
+  background: #2c4560;
+  color: #fff;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+#pausa .opcion:hover { border-color: rgba(255,255,255,0.5); }
+#pausa .opcion.principal { width: 100%; background: #2e7d32; font-size: 18px; font-weight: 800; text-align: center; }
+#pausa details { margin-top: 6px; font-size: 13px; }
+#pausa summary { cursor: pointer; font-weight: 700; margin-bottom: 8px; }
+#pausa table { width: 100%; border-collapse: collapse; }
+#pausa td, #pausa th { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left; }
+#pausa .nota { margin-top: 8px; opacity: 0.8; }
+@media (max-width: 520px) { #pausa .opciones { grid-template-columns: 1fr; } }
 
 /* ---------- Aviso de girar el celular ---------- */
 #girar-celular {
@@ -130,6 +261,15 @@ body.tactil #ayuda-teclado { display: none; }
   font-size: 20px;
 }
 #girar-celular div { font-size: 64px; margin-bottom: 16px; }
+/* Pantallas bajitas (celular en horizontal): todo un poco más chico */
+@media (max-height: 430px) {
+  #minimapa { width: 110px; height: 110px; }
+  .arriba-der { top: calc(max(12px, env(safe-area-inset-top)) + 118px); }
+  #volante-tactil { width: 128px; height: 128px; }
+  #tablero { padding: 4px 12px 6px; }
+  #velocimetro { font-size: 24px; }
+}
+
 @media (orientation: portrait) {
   body.tactil #girar-celular { display: flex; }
 }

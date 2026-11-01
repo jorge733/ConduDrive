@@ -27,12 +27,27 @@ export const CONFIG = {
   graficos: {
     pixelRatioMax: 1.5,        // limita la resolución en pantallas muy densas (celulares)
     tamanoSombra: 1024,        // calidad de las sombras
-    antialias: true
+    antialias: true,
+    espejoAncho: 384,          // resolución de la imagen de los espejos retrovisores
+    espejoAlto: 128
+  },
+
+  semaforo: {
+    verde: 9,                  // segundos en verde
+    amarillo: 3,               // segundos en amarillo
+    todoRojo: 1.5              // segundos con todos en rojo (por seguridad)
+  },
+
+  trafico: {
+    velocidadCrucero: 8.5,     // ~30 km/h, los otros autos andan tranquilos
+    distanciaSeguridad: 7      // metros que dejan con el auto de adelante
   },
 
   ciudad: {
     tamanoManzana: 40,         // lado de cada manzana (metros)
     anchoCalle: 10,            // ancho de cada calle (dos pistas)
-    anchoVereda: 2.2
+    anchoVereda: 2.2,
+    radioRotonda: 14,          // radio exterior de la rotonda
+    radioIsla: 5               // radio de la isla del centro de la rotonda
   }
 };

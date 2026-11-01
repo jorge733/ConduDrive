@@ -8,8 +8,11 @@ import { CONFIG } from './config.js';
 import { Auto } from './auto.js';
 import { Controles } from './controles.js';
 import { ControlCamara } from './camara.js';
-import { crearEscenario } from './escenario.js';
+import { crearCiudad, PUNTOS } from './ciudad.js';
 import { resolverColisiones } from './colisiones.js';
+import { Trafico } from './trafico.js';
+import { Peatones } from './peatones.js';
+import { Interior } from './interior.js';
 
 // ---------- Renderizador (el "pintor" que dibuja la escena) ----------
 const contenedor = document.getElementById('juego');
@@ -18,6 +21,8 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.graficos.pixelRa
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// Las sombras se calculan una vez por cuadro (no de nuevo para los espejos)
+renderer.shadowMap.autoUpdate = false;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 contenedor.appendChild(renderer.domElement);
 
@@ -25,7 +30,7 @@ contenedor.appendChild(renderer.domElement);
 const escena = new THREE.Scene();
 const colorCielo = new THREE.Color(0x9fd3f0);
 escena.background = colorCielo;
-escena.fog = new THREE.Fog(colorCielo, 70, 190);
+escena.fog = new THREE.Fog(colorCielo, 90, 330);
 
 // ---------- Luces (pocas, para que corra bien en celular) ----------
 // Luz ambiente de cielo/suelo: suave, sin sombras
@@ -43,15 +48,19 @@ escena.add(sol, sol.target);
 const desfaseSol = new THREE.Vector3(30, 50, 20);
 
 // ---------- Cámara ----------
-const camara = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 400);
+const camara = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
 
 // ---------- Mundo, auto y controles ----------
-const mundo = crearEscenario(escena);
+const { mundo, semaforo } = crearCiudad(escena);
 const auto = new Auto(escena);
-auto.posicion.set(-27.5, 0, -55);   // pista derecha de una calle (en Chile se maneja por la derecha)
-auto.angulo = 0;                     // mirando hacia +Z
+const interior = new Interior(auto);         // tablero, volante, examinador y espejos
+auto.posicion.set(PUNTOS.inicio.x, 0, PUNTOS.inicio.z); // en el estacionamiento
+auto.angulo = PUNTOS.inicio.angulo;
+const trafico = new Trafico(escena, semaforo);
+const peatones = new Peatones(escena);
 const controles = new Controles();
 const controlCamara = new ControlCamara(camara);
+controlCamara.alCambiar = (modo) => interior.modoInterior(modo === 'interior');
 
 // ---------- HUD (textos en pantalla) ----------
 const elVelocidad = document.getElementById('velocidad');
@@ -73,8 +82,8 @@ function mostrarAviso(texto, ms = 1200) {
 controles.on('intIzq', () => auto.alternarIntermitente('izq'));
 controles.on('intDer', () => auto.alternarIntermitente('der'));
 controles.on('camara', () => {
-  const modo = controlCamara.siguiente();
-  mostrarAviso(modo === 'tercera' ? 'Cámara: detrás' : 'Cámara: aérea', 800);
+  controlCamara.siguiente();
+  mostrarAviso(controlCamara.nombre, 800);
 });
 
 // ---------- Ajustar al tamaño de la pantalla ----------
@@ -86,6 +95,9 @@ function alCambiarTamano() {
 window.addEventListener('resize', alCambiarTamano);
 window.addEventListener('orientationchange', () => setTimeout(alCambiarTamano, 300));
 
+// Acceso para pruebas desde la consola del navegador
+window.ConduDrive = { renderer, escena, auto, semaforo, trafico, peatones };
+
 // ---------- Bucle del juego ----------
 const reloj = new THREE.Clock();
 let ultimoChoque = 0;
@@ -96,24 +108,34 @@ function bucle() {
   // dt = tiempo desde el cuadro anterior (limitado por si el celular se traba)
   const dt = Math.min(reloj.getDelta(), 0.05);
 
-  // 1) Física del auto
+  // 1) El pueblo se mueve: semáforo, autos y peatones
+  semaforo.actualizar(dt);
+  trafico.actualizar(dt, auto);
+  peatones.actualizar(dt);
+
+  // 2) Física del auto del jugador
   auto.actualizar(dt, controles);
 
-  // 2) Choques
+  // 3) Choques (con lo fijo y con lo que se mueve)
+  mundo.dinamicos.length = 0;
+  trafico.agregarColisiones(mundo.dinamicos);
+  peatones.agregarColisiones(mundo.dinamicos);
   const choque = resolverColisiones(auto, mundo);
   auto.grupo.position.copy(auto.posicion);
   const ahora = performance.now();
-  if (choque && choque.fuerza > 2 && ahora - ultimoChoque > 800) {
+  if (choque && choque.tipo === 'peaton') peatones.atropellar();
+  if (choque && (choque.fuerza > 2 || choque.tipo === 'peaton') && ahora - ultimoChoque > 800) {
     ultimoChoque = ahora;
-    mostrarAviso(choque.tipo === 'auto' ? '¡PUM! Chocaste un auto' : '¡Uy! Te subiste a la vereda');
+    const textos = { auto: '¡PUM! Chocaste un auto', peaton: '¡Atropellaste a alguien!', vereda: '¡Uy! Te subiste a la vereda' };
+    mostrarAviso(textos[choque.tipo] || '¡Choque!');
   }
 
-  // 3) Cámara y sol siguen al auto
+  // 4) Cámara y sol siguen al auto
   controlCamara.actualizar(dt, auto);
   sol.position.copy(auto.posicion).add(desfaseSol);
   sol.target.position.copy(auto.posicion);
 
-  // 4) HUD
+  // 5) HUD
   const kmh = Math.round(auto.kmh);
   if (kmh !== ultimaVelocidadMostrada) {
     elVelocidad.textContent = kmh;
@@ -125,7 +147,9 @@ function bucle() {
   btnIntIzq?.classList.toggle('intermitente-on', izqOn);
   btnIntDer?.classList.toggle('intermitente-on', derOn);
 
-  // 5) Dibujar
+  // 6) Dibujar: primero los espejos (si estamos adentro), después la escena
+  interior.actualizar(dt, renderer, escena);
+  renderer.shadowMap.needsUpdate = true;
   renderer.render(escena, camara);
 }
 bucle();

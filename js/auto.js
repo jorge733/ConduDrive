@@ -49,14 +49,23 @@ export class Auto {
     };
 
     const matCuerpo = mat(color, { roughness: 0.45, metalness: 0.1 });
-    const matVidrio = mat(0x2b3d52, { roughness: 0.15, metalness: 0.3 });
+    this.matCuerpo = matCuerpo;
+    // Vidrio semitransparente: desde afuera se ve al conductor y al examinador
+    const matVidrio = mat(0x3d5a78, { roughness: 0.1, metalness: 0.3, transparent: true, opacity: 0.62, depthWrite: false });
     const matNegro = mat(0x222222);
 
     // Carrocería baja y techo (el auto mira hacia +Z)
     caja(1.7, 0.55, 3.8, matCuerpo, 0, 0.6, 0);
-    caja(1.66, 0.12, 1.2, matCuerpo, 0, 0.92, 1.25);   // capó levantado un poco
-    caja(1.5, 0.5, 1.9, matVidrio, 0, 1.12, -0.25);     // cabina de vidrio
-    caja(1.54, 0.08, 1.7, matCuerpo, 0, 1.4, -0.3);     // techo
+    caja(1.66, 0.1, 1.2, matCuerpo, 0, 0.92, 1.25);    // capó
+    this.vidrio = caja(1.5, 0.62, 1.9, matVidrio, 0, 1.185, -0.25); // cabina de vidrio
+    this.vidrio.castShadow = false;
+    this.techo = caja(1.54, 0.08, 1.74, matCuerpo, 0, 1.53, -0.27);  // techo
+    // Pilares que sostienen el techo (se ven desde adentro y desde afuera)
+    for (const x of [0.73, -0.73]) {
+      const a = caja(0.06, 0.66, 0.07, matCuerpo, x, 1.2, 0.62);
+      a.rotation.x = -0.25;
+      caja(0.06, 0.62, 0.07, matCuerpo, x, 1.185, -1.17);
+    }
     // Parachoques
     caja(1.76, 0.22, 0.2, matNegro, 0, 0.42, 1.92);
     caja(1.76, 0.22, 0.2, matNegro, 0, 0.42, -1.92);

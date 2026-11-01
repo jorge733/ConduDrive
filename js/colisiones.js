@@ -1,7 +1,8 @@
 // ===========================================================
 // ConduDrive - CHOQUES
 // Sistema simple: el auto son 2 círculos; los obstáculos son
-// rectángulos (manzanas/veredas, autos estacionados) o círculos (postes).
+// rectángulos (manzanas/veredas, autos estacionados) o círculos
+// (borde de la rotonda, autos que circulan, peatones).
 // Si se tocan, empujamos el auto hacia afuera y le quitamos velocidad.
 // ===========================================================
 import { CONFIG } from './config.js';
@@ -42,8 +43,8 @@ export function resolverColisiones(auto, mundo) {
       if (f !== null && (!peor || f > peor.fuerza)) peor = { fuerza: f, tipo: c.tipo };
     }
 
-    // --- Círculos (postes, árboles) ---
-    for (const o of mundo.circulos) {
+    // --- Círculos (bordes de la rotonda, autos en movimiento, peatones) ---
+    for (const o of circulos(mundo)) {
       const dx = p.x - o.x, dz = p.z - o.z;
       const dist = Math.hypot(dx, dz);
       const minimo = R + o.r;
@@ -53,6 +54,12 @@ export function resolverColisiones(auto, mundo) {
     }
   }
   return peor;
+}
+
+// Recorre los obstáculos fijos y los que se mueven (autos, peatones)
+function* circulos(mundo) {
+  yield* mundo.circulos;
+  if (mundo.dinamicos) yield* mundo.dinamicos;
 }
 
 // Saca al auto del obstáculo y ajusta la velocidad (rebote suave)

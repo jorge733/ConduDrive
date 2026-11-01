@@ -17,6 +17,19 @@ Luego abre <http://localhost:8000> en el navegador.
 
 **Opción B – VS Code**: instala la extensión "Live Server", abre la carpeta y presiona "Go Live".
 
+## Instalarlo como aplicación (PWA) 📲
+
+ConduDrive se puede instalar en el celular o el computador y funciona **sin internet**
+después de abrirlo una vez (el "service worker" `sw.js` guarda el juego y Three.js).
+
+- **Android / Chrome / Edge**: en la pantalla de inicio aparece el botón **📲 Instalar ConduDrive**
+  (o usa "Instalar aplicación" / "Agregar a pantalla principal" en el menú del navegador).
+- **iPhone / iPad (Safari)**: toca **Compartir** → **Agregar a pantalla de inicio**.
+
+Se abre a pantalla completa y en horizontal. Para que funcione hay que servirlo por `https://`
+(o `http://localhost`). Al publicar cambios, sube `VERSION` en `sw.js` para renovar la copia guardada.
+Si agregas archivos nuevos al juego, súmalos también a la lista `ARCHIVOS` de `sw.js`.
+
 ## Controles
 
 | Acción | Computador | Celular | Control (gamepad) |
@@ -100,6 +113,10 @@ Al terminar ves el resultado con todas las faltas, y se guarda tu mejor examen a
 | `js/config.js` | **Números ajustables** (velocidad, agarre, semáforo, tránsito, calidad...) |
 | `js/auto.js` | Modelo 3D del auto del jugador, su física, motor y caja de cambios |
 | `js/examen.js` | Examen práctico: recorrido, reglas, faltas y puntaje |
+| `js/pwa.js` | Registra el service worker y el botón "Instalar" |
+| `sw.js` | Service worker: guarda el juego para usarlo sin internet |
+| `manifest.webmanifest` | Nombre, íconos y colores de la app instalada |
+| `icons/` | Íconos de la app y captura de pantalla |
 | `js/sonido.js` | Sonidos sintetizados (motor, neumáticos, viento, golpes) |
 | `js/marcas.js` | Marcas de neumáticos en el asfalto |
 | `js/lluvia.js` | Lluvia y asfalto mojado |

@@ -5,7 +5,16 @@
   <!-- Evita que el celular haga zoom o mueva la página mientras jugamos -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#1b2a3a" />
+  <meta name="description" content="Juego 3D de conducción: da tu examen práctico de manejo en un pueblo inspirado en Chile." />
   <title>ConduDrive</title>
+  <!-- Aplicación instalable (PWA) -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ConduDrive" />
   <link rel="stylesheet" href="css/estilos.css" />
 
   <!-- "Mapa de importación": le dice al navegador de dónde bajar Three.js (desde internet, CDN jsdelivr) -->
@@ -98,6 +107,7 @@
       <div class="opciones">
         <button class="opcion" data-opcion="examen">📋 <b>Iniciar examen</b></button>
         <button class="opcion" data-opcion="menu">☰ Menú principal</button>
+        <button class="opcion" data-instalar hidden>📲 <b>Instalar ConduDrive</b></button>
       </div>
       <div class="opciones">
         <button class="opcion" data-opcion="caja">Caja: <b>Automática</b></button>
@@ -133,6 +143,8 @@
       <p class="sub">Villa ConduDrive · Examen práctico de conducción</p>
       <button class="opcion principal" data-inicio="examen">📋 Dar el examen práctico</button>
       <button class="opcion principal secundaria" data-inicio="libre">🛣️ Manejo libre</button>
+      <button class="opcion principal instalar" data-instalar hidden>📲 Instalar ConduDrive</button>
+      <p id="ayuda-ios" class="nota-ios" hidden>📲 Para instalarlo en tu iPhone o iPad: toca <b>Compartir</b> y luego <b>Agregar a pantalla de inicio</b>.</p>
       <div class="reglas">
         <p>Partes con <b>100 puntos</b>. El examinador te irá dando instrucciones.</p>
         <ul>

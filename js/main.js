@@ -19,6 +19,7 @@ import { Lluvia } from './lluvia.js';
 import { Minimapa } from './minimapa.js';
 import { CALLES, ROTONDA } from './ciudad.js';
 import { Examen, limiteEn } from './examen.js';
+import { iniciarPWA } from './pwa.js';
 
 // ---------- Renderizador (el "pintor" que dibuja la escena) ----------
 const contenedor = document.getElementById('juego');
@@ -333,6 +334,7 @@ document.querySelectorAll('[data-resultado]').forEach((b) => b.addEventListener(
   else { cancelarResultado(); mostrarPantalla(null); }
 }));
 mostrarInicio();
+iniciarPWA({ alAvisar: (t, ms) => mostrarAviso(t, ms) });
 
 // ---------- Límite de velocidad según la zona (ver examen.js) ----------
 let tiempoExceso = 0, avisoExcesoDado = false;

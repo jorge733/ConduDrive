@@ -232,7 +232,7 @@ export class Auto {
     // (así, si frenas hasta parar en un semáforo, el auto NO se va para atrás)
     const pedalInverso = this.marcha === 'R' ? ent.acelerador : ent.freno;
     if (pedalInverso < 0.05) this._pedalNuevo = false;
-    else if (Math.abs(u) < 2 && !this._pedalPrevio) this._pedalNuevo = true; // pisado casi detenido
+    else if (Math.abs(u) < 0.3 && !this._pedalPrevio) this._pedalNuevo = true; // pisado ya detenido (o casi)
     this._pedalPrevio = pedalInverso >= 0.05;
     if (!this.cajaManual) {
       if (this.marcha === 'R') {
@@ -244,7 +244,7 @@ export class Auto {
       } else {
         if (parado && this._pedalNuevo && ent.freno > 0.3 && ent.acelerador < 0.05) this._tiempoInversion += dt;
         else this._tiempoInversion = 0;
-        if (this._tiempoInversion > 0.35) { this._ponerMarcha('R'); this._tiempoInversion = 0; this._pedalPrevio = true; }
+        if (this._tiempoInversion > 0.6) { this._ponerMarcha('R'); this._tiempoInversion = 0; this._pedalPrevio = true; }
       }
     }
     this.acelerador = acel;

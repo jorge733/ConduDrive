@@ -36,6 +36,17 @@
       <span id="ind-der" class="flecha">▶</span>
     </div>
     <canvas id="minimapa"></canvas>
+    <!-- Panel del examen: puntaje, tiempo, instrucción del examinador y últimas faltas -->
+    <div id="examen">
+      <div class="fila">
+        <div>Puntaje <b id="ex-puntaje" class="ok">100</b></div>
+        <div>⏱ <span id="ex-tiempo">0:00</span></div>
+      </div>
+      <div class="progreso"><div id="ex-barra"></div></div>
+      <div id="ex-instruccion">—</div>
+      <div id="ex-extra"></div>
+      <ul id="ex-faltas"></ul>
+    </div>
     <div id="aviso"></div>
     <div id="ayuda-teclado">
       Flechas/WASD: manejar · Espacio: freno de mano · Q/E: intermitentes · C: cámara · B: mirar atrás · R: reubicar · P: pausa
@@ -85,6 +96,10 @@
       <p class="sub">Pausa</p>
       <button id="btn-continuar" class="opcion principal">▶ Continuar</button>
       <div class="opciones">
+        <button class="opcion" data-opcion="examen">📋 <b>Iniciar examen</b></button>
+        <button class="opcion" data-opcion="menu">☰ Menú principal</button>
+      </div>
+      <div class="opciones">
         <button class="opcion" data-opcion="caja">Caja: <b>Automática</b></button>
         <button class="opcion" data-opcion="lluvia">Clima: <b>Despejado</b></button>
         <button class="opcion" data-opcion="esc">Control de estabilidad: <b>Sí</b></button>
@@ -108,6 +123,45 @@
         </table>
         <p class="nota">En celular: gira el volante arrastrando el dedo. En los pedales, mientras más arriba aprietes, más fuerte.</p>
       </details>
+    </div>
+  </div>
+
+  <!-- ===== Pantalla de inicio ===== -->
+  <div id="inicio" class="pantalla visible">
+    <div class="panel">
+      <h1>ConduDrive 🚗</h1>
+      <p class="sub">Villa ConduDrive · Examen práctico de conducción</p>
+      <button class="opcion principal" data-inicio="examen">📋 Dar el examen práctico</button>
+      <button class="opcion principal secundaria" data-inicio="libre">🛣️ Manejo libre</button>
+      <div class="reglas">
+        <p>Partes con <b>100 puntos</b>. El examinador te irá dando instrucciones.</p>
+        <ul>
+          <li><span class="leve">Falta leve −3</span> no señalizar, frenar brusco, exceso leve de velocidad…</li>
+          <li><span class="grave">Falta grave −10</span> chocar, pista contraria, no ceder el paso, exceso en zona escolar…</li>
+          <li><span class="eliminatoria">Eliminatoria</span> luz roja, no parar en el PARE, no respetar al peatón, contra el sentido de la rotonda.</li>
+        </ul>
+        <p>Apruebas si terminas con <b>75 puntos o más</b>.</p>
+        <p id="mejor-puntaje"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Resultado del examen ===== -->
+  <div id="resultado" class="pantalla">
+    <div class="panel">
+      <h1 id="res-titulo">APROBADO</h1>
+      <p class="sub" id="res-motivo"></p>
+      <div class="res-numeros">
+        <div><span>Puntaje</span><b id="res-puntaje">100</b></div>
+        <div><span>Tiempo</span><b id="res-tiempo">0:00</b></div>
+        <div><span>Faltas</span><b id="res-cantidad">0</b></div>
+      </div>
+      <ul id="res-faltas"></ul>
+      <p id="res-mejor"></p>
+      <div class="opciones">
+        <button class="opcion principal" data-resultado="repetir">↺ Repetir examen</button>
+        <button class="opcion principal secundaria" data-resultado="libre">🛣️ Manejo libre</button>
+      </div>
     </div>
   </div>
 

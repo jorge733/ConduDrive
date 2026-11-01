@@ -36,6 +36,26 @@ Luego abre <http://localhost:8000> en el navegador.
 
 Las opciones del menú de pausa (caja, clima, control de estabilidad, sonido) se recuerdan entre partidas.
 
+## Examen práctico 📋
+
+Al abrir el juego eliges **Dar el examen práctico** o **Manejo libre** (también desde el menú de pausa).
+El examinador va sentado a tu lado y te da las instrucciones en pantalla y en voz alta.
+La próxima meta aparece como un anillo azul en la calle y como una línea en el minimapa.
+
+**Recorrido:** salir del estacionamiento → semáforo → paso de cebra → disco PARE → CEDA EL PASO →
+rotonda (segunda salida) → zona escolar → **estacionar en paralelo** → semáforo con viraje a la
+izquierda → volver y **estacionar en tu lugar** original.
+
+**Puntaje:** partes con 100 puntos y apruebas con **75 o más**.
+
+| Tipo de falta | Descuento | Ejemplos |
+|---|---|---|
+| Leve | −3 | no señalizar un viraje, la salida de la rotonda o al salir de estacionar; subirse a la solera; frenada brusca; exceso leve de velocidad; desviarse del recorrido |
+| Grave | −10 | chocar; circular por la pista contraria; no ceder el paso; exceso en zona escolar o de más de 15 km/h; derrapar; no lograr estacionar a tiempo; pedir reubicar el auto (R) |
+| Eliminatoria | reprueba | cruzar con luz roja; no detenerse en el PARE; no respetar al peatón en la cebra; atropellar; ir contra el sentido de la rotonda; choque fuerte; pasar los 15 minutos |
+
+Al terminar ves el resultado con todas las faltas, y se guarda tu mejor examen aprobado.
+
 ## Conducción realista
 
 - **Física de verdad (simplificada)**: masa, inercia, traspaso de peso al frenar/acelerar y
@@ -79,6 +99,7 @@ Las opciones del menú de pausa (caja, clima, control de estabilidad, sonido) se
 | `js/main.js` | Arma todo y ejecuta el bucle del juego |
 | `js/config.js` | **Números ajustables** (velocidad, agarre, semáforo, tránsito, calidad...) |
 | `js/auto.js` | Modelo 3D del auto del jugador, su física, motor y caja de cambios |
+| `js/examen.js` | Examen práctico: recorrido, reglas, faltas y puntaje |
 | `js/sonido.js` | Sonidos sintetizados (motor, neumáticos, viento, golpes) |
 | `js/marcas.js` | Marcas de neumáticos en el asfalto |
 | `js/lluvia.js` | Lluvia y asfalto mojado |

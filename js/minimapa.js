@@ -21,7 +21,7 @@ export class Minimapa {
     this._t = 0;
   }
 
-  actualizar(dt, auto, trafico) {
+  actualizar(dt, auto, trafico, examen) {
     this._t += dt;
     if (this._t < 1 / 15) return; // 15 veces por segundo basta
     this._t = 0;
@@ -78,6 +78,24 @@ export class Minimapa {
 
     // Otros autos
     if (trafico) for (const a of trafico.autos) punto(a, '#ffffff', 1.8);
+
+    // Recorrido del examen: línea punteada hasta la meta siguiente
+    if (examen && examen.activo) {
+      const ruta = examen.rutaPendiente;
+      if (ruta.length) {
+        ctx.strokeStyle = 'rgba(51, 195, 255, 0.9)';
+        ctx.lineWidth = 2.2;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(auto.posicion.x, auto.posicion.z);
+        for (const [x, z] of ruta) ctx.lineTo(x, z);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const o = examen.objetivo;
+        const pulso = 3.5 + Math.sin(performance.now() / 200) * 1.2;
+        punto(o, '#33c3ff', pulso);
+      }
+    }
     ctx.restore();
 
     // El auto del jugador (siempre al centro, mirando hacia arriba)

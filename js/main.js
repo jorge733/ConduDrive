@@ -18,6 +18,7 @@ import { MarcasNeumaticos } from './marcas.js';
 import { Lluvia } from './lluvia.js';
 import { Minimapa } from './minimapa.js';
 import { CALLES, ROTONDA } from './ciudad.js';
+import { Examen, limiteEn } from './examen.js';
 
 // ---------- Renderizador (el "pintor" que dibuja la escena) ----------
 const contenedor = document.getElementById('juego');
@@ -124,9 +125,19 @@ function aplicarOpciones() {
 
 // ---------- Pausa ----------
 let pausado = false;
+let enPantalla = true; // pantalla de inicio o de resultado abierta (el juego espera)
 function ponerPausa(p) {
+  if (enPantalla) return;
   pausado = p;
   elPausa.classList.toggle('visible', p);
+  controles.soltarTodo();
+  if (window.speechSynthesis) p ? speechSynthesis.pause() : speechSynthesis.resume();
+}
+function mostrarPantalla(id) {
+  for (const el of document.querySelectorAll('.pantalla')) el.classList.toggle('visible', el.id === id);
+  enPantalla = !!id;
+  pausado = !!id;
+  elPausa.classList.remove('visible');
   controles.soltarTodo();
 }
 
@@ -181,7 +192,11 @@ controles.on('camara', () => {
   mostrarAviso(controlCamara.nombre, 800);
 });
 controles.on('pausa', () => ponerPausa(!pausado));
-controles.on('reiniciar', () => { if (!pausado) reubicar(); });
+controles.on('reiniciar', () => {
+  if (pausado) return;
+  if (examen.activo) examen.registrarAyuda();
+  reubicar();
+});
 controles.on('caja', () => {
   opciones.cajaManual = !opciones.cajaManual;
   aplicarOpciones();
@@ -216,19 +231,97 @@ document.querySelectorAll('[data-opcion]').forEach((b) => b.addEventListener('cl
   if (o === 'lluvia') opciones.lluvia = !opciones.lluvia;
   if (o === 'esc') opciones.esc = !opciones.esc;
   if (o === 'sonido') { opciones.sonido = !opciones.sonido; sonido.iniciar(); }
-  if (o === 'reiniciar') { reubicar(); ponerPausa(false); }
-  if (o === 'inicio') { volverAlInicio(); ponerPausa(false); }
+  if (o === 'reiniciar') { if (examen.activo) examen.registrarAyuda(); reubicar(); ponerPausa(false); }
+  if (o === 'inicio') { examen.abandonar(); volverAlInicio(); ponerPausa(false); }
+  if (o === 'examen') {
+    if (examen.activo) { examen.abandonar(); } else { ponerPausa(false); iniciarExamen(); }
+  }
+  if (o === 'menu') { examen.activo && examen.abandonar(); mostrarInicio(); }
   aplicarOpciones();
+  actualizarBotonExamen();
 }));
 aplicarOpciones();
 
-// ---------- Límite de velocidad según la zona ----------
-function limiteEn(x, z) {
-  const L = CONFIG.limites, ze = PUNTOS.zonaEscolar;
-  if (Math.abs(x + 50) < 20 && Math.abs(z + 50) < 20) return L.estacionamiento;
-  if (Math.abs(z - ze.z) < 6 && x < ze.desdeX + 4 && x > ze.hastaX - 4) return L.zonaEscolar;
-  return L.urbano;
+// ---------- EXAMEN ----------
+const examen = new Examen({
+  escena, auto, semaforo, peatones, trafico, interior, sonido,
+  alAvisar: (t, ms) => mostrarAviso(t, ms),
+  alTerminar: (r) => setTimeout(() => mostrarResultado(r), r.completo ? 1200 : 2500)
+});
+
+function leerMejor() {
+  try { return JSON.parse(localStorage.getItem('condudrive-mejor') || 'null'); } catch (e) { return null; }
 }
+function textoTiempo(seg) {
+  const t = Math.floor(seg);
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
+function mostrarInicio() {
+  const mejor = leerMejor();
+  $('mejor-puntaje').textContent = mejor ? `🏆 Tu mejor examen aprobado: ${mejor.puntaje} puntos en ${textoTiempo(mejor.tiempo)}` : '';
+  mostrarPantalla('inicio');
+}
+function iniciarExamen() {
+  volverAlInicio();
+  auto.intermitente = null;
+  mostrarPantalla(null);
+  sonido.iniciar();
+  examen.iniciar();
+  actualizarBotonExamen();
+}
+function actualizarBotonExamen() {
+  const b = document.querySelector('[data-opcion="examen"] b');
+  if (b) b.textContent = examen.activo ? 'Abandonar examen' : 'Iniciar examen';
+}
+function mostrarResultado(r) {
+  if (examen.activo) return; // ya empezó otro
+  const titulo = $('res-titulo');
+  titulo.textContent = r.aprobado ? '✅ APROBADO' : '❌ REPROBADO';
+  titulo.className = r.aprobado ? 'aprobado' : 'reprobado';
+  $('res-motivo').textContent = r.aprobado ? '¡Felicitaciones! Ya puedes ir a buscar tu licencia.' : (r.motivo || '');
+  $('res-puntaje').textContent = r.puntaje;
+  $('res-tiempo').textContent = textoTiempo(r.tiempo);
+  $('res-cantidad').textContent = r.faltas.length;
+  // Faltas agrupadas: "No señalizó el viraje (x2) −6"
+  const lista = $('res-faltas');
+  lista.innerHTML = '';
+  const grupos = new Map();
+  for (const f of r.faltas) {
+    const g = grupos.get(f.texto) || { ...f, veces: 0, total: 0 };
+    g.veces++; g.total += f.puntos;
+    grupos.set(f.texto, g);
+  }
+  for (const g of grupos.values()) {
+    const li = document.createElement('li');
+    li.className = g.tipo;
+    li.textContent = `${g.tipo === 'eliminatoria' ? '✖' : '−' + g.total} · ${g.texto}${g.veces > 1 ? ` (×${g.veces})` : ''}`;
+    lista.appendChild(li);
+  }
+  if (!r.faltas.length) lista.innerHTML = '<li class="sin">¡Sin faltas! Conducción perfecta.</li>';
+  // Mejor puntaje (solo exámenes aprobados)
+  let mejor = leerMejor();
+  let record = false;
+  if (r.aprobado && (!mejor || r.puntaje > mejor.puntaje || (r.puntaje === mejor.puntaje && r.tiempo < mejor.tiempo))) {
+    mejor = { puntaje: r.puntaje, tiempo: r.tiempo };
+    record = true;
+    try { localStorage.setItem('condudrive-mejor', JSON.stringify(mejor)); } catch (e) { /* sin almacenamiento */ }
+  }
+  $('res-mejor').textContent = record ? '🏆 ¡Nuevo récord!' : (mejor ? `🏆 Mejor: ${mejor.puntaje} puntos en ${textoTiempo(mejor.tiempo)}` : '');
+  actualizarBotonExamen();
+  mostrarPantalla('resultado');
+}
+document.querySelectorAll('[data-inicio]').forEach((b) => b.addEventListener('click', () => {
+  sonido.iniciar();
+  if (b.dataset.inicio === 'examen') iniciarExamen();
+  else { mostrarPantalla(null); }
+}));
+document.querySelectorAll('[data-resultado]').forEach((b) => b.addEventListener('click', () => {
+  if (b.dataset.resultado === 'repetir') iniciarExamen();
+  else mostrarPantalla(null);
+}));
+mostrarInicio();
+
+// ---------- Límite de velocidad según la zona (ver examen.js) ----------
 let tiempoExceso = 0, avisoExcesoDado = false;
 
 // ---------- Ajustar al tamaño de la pantalla ----------
@@ -241,7 +334,7 @@ window.addEventListener('resize', alCambiarTamano);
 window.addEventListener('orientationchange', () => setTimeout(alCambiarTamano, 300));
 
 // Acceso para pruebas desde la consola del navegador
-window.ConduDrive = { renderer, escena, auto, semaforo, trafico, peatones, barreras, controles, reubicar };
+window.ConduDrive = { renderer, escena, auto, semaforo, trafico, peatones, barreras, controles, reubicar, examen, simular: (dt) => simular(dt) };
 
 // ---------- Bucle del juego ----------
 const reloj = new THREE.Clock();
@@ -252,8 +345,14 @@ function bucle() {
   requestAnimationFrame(bucle);
   // dt = tiempo desde el cuadro anterior (limitado por si el celular se traba)
   const dt = Math.min(reloj.getDelta(), 0.05);
+  if (!pausado) simular(dt);
+  else controles.leer(dt); // sigue leyendo el gamepad (para el botón Start)
+  dibujar(dt);
+}
 
-  if (!pausado) {
+/** Avanza el mundo dt segundos (sin dibujar). Las pruebas automáticas lo llaman directo. */
+function simular(dt) {
+  {
     // 1) El pueblo se mueve: semáforo, autos y peatones
     semaforo.actualizar(dt);
     trafico.actualizar(dt, auto);
@@ -270,6 +369,7 @@ function bucle() {
     mundo.cajasDinamicas.length = 0;
     barreras.agregarColisiones(mundo.cajasDinamicas);
     const choque = resolverColisiones(auto, mundo);
+    examen.registrarChoque(choque);
     auto.grupo.position.copy(auto.posicion);
     const ahora = performance.now();
     if (choque && choque.tipo === 'peaton') peatones.atropellar();
@@ -283,13 +383,14 @@ function bucle() {
       mostrarAviso(textos[choque.tipo] || '¡Choque!');
     }
     marcas.actualizar(auto);
+    examen.actualizar(dt);
 
     // Límite de velocidad
     const limite = limiteEn(auto.posicion.x, auto.posicion.z);
     if (elLimiteNum.textContent !== String(limite)) elLimiteNum.textContent = limite;
     const excede = auto.kmh > limite + 3;
     tiempoExceso = excede ? tiempoExceso + dt : 0;
-    if (tiempoExceso > 1.2 && !avisoExcesoDado) {
+    if (tiempoExceso > 1.2 && !avisoExcesoDado && !examen.activo) { // en el examen lo anota el examinador
       avisoExcesoDado = true;
       mostrarAviso(`¡Exceso de velocidad! Máximo ${limite} km/h`, 1600);
       sonido.pitido();
@@ -297,10 +398,10 @@ function bucle() {
     if (!excede && auto.kmh < limite) avisoExcesoDado = false;
     elVelocimetro.classList.toggle('exceso', excede);
     elLimite.classList.toggle('alerta', tiempoExceso > 0.5);
-  } else {
-    controles.leer(dt); // sigue leyendo el gamepad (para el botón Start)
   }
+}
 
+function dibujar(dt) {
   // 4) Cámara y sol siguen al auto
   const atras = !!controles.mirandoAtras;
   if (atras !== controlCamara.mirarAtras) { controlCamara.mirarAtras = atras; controlCamara._primerCuadro = true; }
@@ -309,7 +410,7 @@ function bucle() {
   sol.target.position.copy(auto.posicion);
   lluvia.actualizar(pausado ? 0 : dt, camara, auto.velocidad.x, auto.velocidad.y);
   sonido.actualizar(auto, opciones.lluvia, pausado);
-  minimapa.actualizar(dt, auto, trafico);
+  minimapa.actualizar(dt, auto, trafico, examen);
 
   // 5) HUD
   const kmh = Math.round(auto.kmh);

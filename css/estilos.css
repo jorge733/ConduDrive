@@ -201,6 +201,80 @@ body.tactil #ayuda-teclado { display: none; }
 body.caja-manual .columna-cambios { display: flex; }
 .boton.cambio { border-radius: 12px; width: 48px; height: 44px; font-size: 18px; }
 
+/* Panel del examen */
+#examen {
+  display: none;
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  width: 270px;
+  background: rgba(15, 25, 40, 0.72);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+#examen.visible { display: block; }
+body.tactil #examen { top: calc(max(12px, env(safe-area-inset-top)) + 64px); width: 230px; font-size: 12px; }
+#examen .fila { display: flex; justify-content: space-between; align-items: baseline; }
+#ex-puntaje { font-size: 22px; margin-left: 4px; }
+#ex-puntaje.ok { color: #69f0ae; }
+#ex-puntaje.mal { color: #ff5252; }
+#examen .progreso { height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; margin: 6px 0; overflow: hidden; }
+#ex-barra { height: 100%; width: 0; background: #33c3ff; transition: width 0.5s; }
+#ex-instruccion { font-size: 15px; font-weight: 700; line-height: 1.25; color: #fff; }
+#ex-instruccion.nueva { animation: destacar 1.2s; }
+@keyframes destacar { 0% { color: #33c3ff; transform: scale(1.04); } 100% { color: #fff; transform: none; } }
+#ex-extra { color: #ffd23f; font-weight: 700; margin-top: 4px; min-height: 0; }
+#ex-faltas { list-style: none; margin-top: 6px; }
+#ex-faltas li { padding: 2px 0; font-size: 12px; }
+.leve { color: #ffd23f; }
+.grave { color: #ff8a50; }
+.eliminatoria { color: #ff5252; font-weight: 800; }
+
+/* Pantallas de inicio y resultado (mismo estilo que la pausa) */
+.pantalla {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 18, 30, 0.78);
+  z-index: 6;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  touch-action: pan-y;
+}
+.pantalla.visible { display: flex; }
+.pantalla .panel, #pausa .panel {
+  background: #1f3247;
+  border-radius: 18px;
+  padding: 22px 24px;
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+.pantalla h1 { font-size: 30px; }
+.pantalla .sub { opacity: 0.75; margin-bottom: 14px; }
+.pantalla .opcion {
+  background: #2c4560; color: #fff; border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 10px; padding: 12px; font-size: 16px; cursor: pointer; width: 100%;
+}
+.pantalla .opcion.principal { background: #2e7d32; font-weight: 800; margin-bottom: 8px; }
+.pantalla .opcion.secundaria { background: #2c4560; }
+.pantalla .opciones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.reglas { font-size: 13px; margin-top: 10px; line-height: 1.45; }
+.reglas ul { margin: 6px 0 6px 18px; }
+#mejor-puntaje, #res-mejor { margin-top: 8px; color: #8fd3ff; font-weight: 700; }
+#res-titulo.aprobado { color: #69f0ae; }
+#res-titulo.reprobado { color: #ff5252; }
+.res-numeros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0 12px; text-align: center; }
+.res-numeros div { background: rgba(255,255,255,0.06); border-radius: 10px; padding: 8px; }
+.res-numeros span { display: block; font-size: 12px; opacity: 0.7; }
+.res-numeros b { font-size: 24px; }
+#res-faltas { list-style: none; font-size: 13px; max-height: 180px; overflow-y: auto; }
+#res-faltas li { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+#res-faltas li.sin { color: #69f0ae; }
+
 /* Menú de pausa */
 #pausa {
   display: none;

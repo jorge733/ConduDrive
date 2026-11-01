@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Evita que el celular haga zoom o mueva la página mientras jugamos -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#1b2a3a" />
+  <title>ConduDrive</title>
+  <link rel="stylesheet" href="css/estilos.css" />
+
+  <!-- "Mapa de importación": le dice al navegador de dónde bajar Three.js (desde internet, CDN jsdelivr) -->
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+  <!-- Aquí se dibuja el mundo 3D -->
+  <div id="juego"></div>
+
+  <!-- ===== HUD: información sobre la pantalla ===== -->
+  <div id="hud">
+    <div id="velocimetro"><span id="velocidad">0</span><small>km/h</small></div>
+    <div id="indicadores">
+      <span id="ind-izq" class="flecha">◀</span>
+      <span id="ind-der" class="flecha">▶</span>
+    </div>
+    <div id="aviso"></div>
+    <div id="ayuda-teclado">
+      Flechas/WASD: manejar · Espacio: freno de mano · Q/E: intermitentes · C: cámara
+    </div>
+  </div>
+
+  <!-- ===== Controles táctiles (solo se muestran en celular) ===== -->
+  <div id="controles-tactiles">
+    <!-- Arriba a la izquierda: intermitentes -->
+    <div class="grupo arriba-izq">
+      <button class="boton chico" data-toque="intIzq">⬅</button>
+      <button class="boton chico" data-toque="intDer">➡</button>
+    </div>
+    <!-- Arriba a la derecha: cámara -->
+    <div class="grupo arriba-der">
+      <button class="boton chico" data-toque="camara">🎥</button>
+    </div>
+    <!-- Abajo a la izquierda: girar -->
+    <div class="grupo abajo-izq">
+      <button class="boton grande" data-mantener="izquierda">◀</button>
+      <button class="boton grande" data-mantener="derecha">▶</button>
+    </div>
+    <!-- Abajo a la derecha: pedales -->
+    <div class="grupo abajo-der">
+      <button class="boton mediano freno-mano" data-mantener="frenoMano">FRENO<br>MANO</button>
+      <button class="boton pedal freno" data-mantener="frenar">FRENO<br><small>/ atrás</small></button>
+      <button class="boton pedal acelerador" data-mantener="acelerar">ACELERAR</button>
+    </div>
+  </div>
+
+  <!-- Mensaje para poner el celular en horizontal -->
+  <div id="girar-celular">
+    <div>📱↻</div>
+    <p>Gira tu celular en horizontal para manejar</p>
+  </div>
+
+  <!-- Punto de partida del juego -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

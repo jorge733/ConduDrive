@@ -35,6 +35,7 @@ export class Auto {
     this.velocidadLateral = 0;  // velocidad de lado (derrape)
     this.aceleracionActual = 0; // aceleración longitudinal (m/s²), para el cabeceo
     this.aceleracionLateral = 0;// aceleración lateral (m/s²), para el balanceo
+    this.desaceleracion = 0;    // frenado real medido (m/s², positivo al frenar)
     this.frenando = false;
     this.lluvia = false;        // asfalto mojado = menos agarre
     this.esc = true;            // control de estabilidad
@@ -231,8 +232,11 @@ export class Auto {
     // Para cambiar entre D y R hay que estar detenido y volver a pisar el pedal
     // (así, si frenas hasta parar en un semáforo, el auto NO se va para atrás)
     const pedalInverso = this.marcha === 'R' ? ent.acelerador : ent.freno;
+    this._reloj = (this._reloj || 0) + dt;
+    if (Math.abs(u) < 0.05) this._ultimoDetenido = this._reloj;
+    const recienDetenido = this._reloj - (this._ultimoDetenido ?? -99) < 0.5;
     if (pedalInverso < 0.05) this._pedalNuevo = false;
-    else if (Math.abs(u) < 0.3 && !this._pedalPrevio) this._pedalNuevo = true; // pisado ya detenido (o casi)
+    else if ((Math.abs(u) < 0.3 || recienDetenido) && Math.abs(u) < 0.6 && !this._pedalPrevio) this._pedalNuevo = true; // pisado detenido (o recién)
     this._pedalPrevio = pedalInverso >= 0.05;
     if (!this.cajaManual) {
       if (this.marcha === 'R') {
@@ -278,7 +282,7 @@ export class Auto {
       }
       let torque = 0;
       if (pedal > 0.01) torque = this._curvaTorque(rpm) * pedal;
-      this.limitador = rpm >= (this.marcha === 'R' ? 3000 : C.rpmMax); // reversa limitada (~25 km/h)
+      this.limitador = rpm >= (this.marcha === 'R' ? 2000 : C.rpmMax); // reversa limitada (~17 km/h)
       if (this.limitador) torque = 0;
       // Freno motor (al soltar el acelerador, el motor retiene)
       if (pedal < 0.05 && mismoSentido && rpmRuedas > C.rpmRalenti * 1.15) {
@@ -294,7 +298,7 @@ export class Auto {
     this._fuerzaMotor = fuerza;
     // Las revoluciones del motor no saltan de golpe (inercia del motor)
     this.rpm += (rpmMotor - this.rpm) * Math.min(1, dt * 14);
-    if (this.limitador) this.rpm = (this.marcha === 'R' ? 3000 : C.rpmMax) - Math.random() * 250; // tiritón del corte
+    if (this.limitador) this.rpm = (this.marcha === 'R' ? 2000 : C.rpmMax) - Math.random() * 150; // tiritón del corte
 
     // --- Cambio automático ---
     if (!this.cajaManual && typeof this.marcha === 'number' && this._corteCambio <= 0) {
@@ -344,6 +348,9 @@ export class Auto {
     this.deslizamiento += (limitar(this._deslizMax, 0, 1) - this.deslizamiento) * Math.min(1, dt * 12);
     this.frenando = this.freno > 0.05 || ent.frenoMano;
     this._dvLong = (this.velocidadAvance - vAntes) / Math.max(dt, 1e-4);
+    // Desaceleración real (incluye frenos), suavizada ~0,2 s. Positiva = frenando.
+    const dec = Math.abs(vAntes) > 0.3 ? -this._dvLong * Math.sign(vAntes) : 0;
+    this.desaceleracion += (dec - this.desaceleracion) * Math.min(1, dt / 0.2);
 
     this._actualizarIntermitentes(dt);
     this._actualizarVisual(dt);
@@ -513,7 +520,7 @@ export class Auto {
   detener() {
     this.velocidad.set(0, 0);
     this.velocidadAvance = this.velocidadLateral = this.velocidadGiro = 0;
-    this.aceleracionActual = this.aceleracionLateral = 0;
+    this.aceleracionActual = this.aceleracionLateral = this.desaceleracion = 0;
     this._direccion = 0; this.giro = 0;
     if (!this.cajaManual) this.marcha = 1;
   }

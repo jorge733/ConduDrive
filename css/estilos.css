@@ -214,7 +214,15 @@ body.caja-manual .columna-cambios { display: flex; }
   font-size: 13px;
 }
 #examen.visible { display: block; }
-body.tactil #examen { top: calc(max(12px, env(safe-area-inset-top)) + 64px); width: 230px; font-size: 12px; }
+body.tactil #examen {
+  top: calc(max(12px, env(safe-area-inset-top)) + 64px);
+  width: 230px;
+  font-size: 12px;
+  /* que no quede debajo del volante táctil (150 px + márgenes) */
+  max-height: calc(100vh - max(12px, env(safe-area-inset-top)) - 64px - 150px - 32px);
+  overflow: hidden;
+}
+body.tactil #ex-instruccion { font-size: 13px; }
 #examen .fila { display: flex; justify-content: space-between; align-items: baseline; }
 #ex-puntaje { font-size: 22px; margin-left: 4px; }
 #ex-puntaje.ok { color: #69f0ae; }
@@ -342,6 +350,9 @@ body.tactil #examen { top: calc(max(12px, env(safe-area-inset-top)) + 64px); wid
   #volante-tactil { width: 128px; height: 128px; }
   #tablero { padding: 4px 12px 6px; }
   #velocimetro { font-size: 24px; }
+  body.tactil #examen { max-height: calc(100vh - max(12px, env(safe-area-inset-top)) - 64px - 128px - 28px); padding: 6px 10px; }
+  body.tactil #ex-faltas li:nth-child(n+2) { display: none; } /* solo la última falta */
+  body.tactil #ex-instruccion { font-size: 12px; }
 }
 
 @media (orientation: portrait) {

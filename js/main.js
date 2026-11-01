@@ -139,6 +139,8 @@ function mostrarPantalla(id) {
   pausado = !!id;
   elPausa.classList.remove('visible');
   controles.soltarTodo();
+  // Si la voz quedó pausada (por la pausa), se reanuda; al cambiar de pantalla se calla lo pendiente
+  if (window.speechSynthesis) { speechSynthesis.resume(); if (id === 'inicio') speechSynthesis.cancel(); }
 }
 
 // ---------- Reubicar el auto ----------
@@ -236,7 +238,7 @@ document.querySelectorAll('[data-opcion]').forEach((b) => b.addEventListener('cl
   if (o === 'examen') {
     if (examen.activo) { examen.abandonar(); } else { ponerPausa(false); iniciarExamen(); }
   }
-  if (o === 'menu') { examen.activo && examen.abandonar(); mostrarInicio(); }
+  if (o === 'menu') { if (examen.activo) examen.abandonar(); mostrarInicio(); }
   aplicarOpciones();
   actualizarBotonExamen();
 }));
@@ -246,8 +248,23 @@ aplicarOpciones();
 const examen = new Examen({
   escena, auto, semaforo, peatones, trafico, interior, sonido,
   alAvisar: (t, ms) => mostrarAviso(t, ms),
-  alTerminar: (r) => setTimeout(() => mostrarResultado(r), r.completo ? 1200 : 2500)
+  alTerminar: (r) => {
+    // El récord se guarda al terminar (aunque después se empiece otro examen antes de ver el resultado)
+    r.record = guardarRecord(r);
+    actualizarBotonExamen();
+    clearTimeout(temporizadorResultado);
+    temporizadorResultado = setTimeout(() => mostrarResultado(r), r.abandonado ? 0 : (r.completo ? 1200 : 2500));
+  }
 });
+let temporizadorResultado = null;
+function cancelarResultado() { clearTimeout(temporizadorResultado); temporizadorResultado = null; }
+function guardarRecord(r) {
+  const mejor = leerMejor();
+  if (!r.aprobado) return false;
+  if (mejor && (r.puntaje < mejor.puntaje || (r.puntaje === mejor.puntaje && r.tiempo >= mejor.tiempo))) return false;
+  try { localStorage.setItem('condudrive-mejor', JSON.stringify({ puntaje: r.puntaje, tiempo: r.tiempo })); } catch (e) { /* sin almacenamiento */ }
+  return true;
+}
 
 function leerMejor() {
   try { return JSON.parse(localStorage.getItem('condudrive-mejor') || 'null'); } catch (e) { return null; }
@@ -257,11 +274,13 @@ function textoTiempo(seg) {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 }
 function mostrarInicio() {
+  cancelarResultado();
   const mejor = leerMejor();
   $('mejor-puntaje').textContent = mejor ? `🏆 Tu mejor examen aprobado: ${mejor.puntaje} puntos en ${textoTiempo(mejor.tiempo)}` : '';
   mostrarPantalla('inicio');
 }
 function iniciarExamen() {
+  cancelarResultado();
   volverAlInicio();
   auto.intermitente = null;
   mostrarPantalla(null);
@@ -298,26 +317,20 @@ function mostrarResultado(r) {
     lista.appendChild(li);
   }
   if (!r.faltas.length) lista.innerHTML = '<li class="sin">¡Sin faltas! Conducción perfecta.</li>';
-  // Mejor puntaje (solo exámenes aprobados)
-  let mejor = leerMejor();
-  let record = false;
-  if (r.aprobado && (!mejor || r.puntaje > mejor.puntaje || (r.puntaje === mejor.puntaje && r.tiempo < mejor.tiempo))) {
-    mejor = { puntaje: r.puntaje, tiempo: r.tiempo };
-    record = true;
-    try { localStorage.setItem('condudrive-mejor', JSON.stringify(mejor)); } catch (e) { /* sin almacenamiento */ }
-  }
-  $('res-mejor').textContent = record ? '🏆 ¡Nuevo récord!' : (mejor ? `🏆 Mejor: ${mejor.puntaje} puntos en ${textoTiempo(mejor.tiempo)}` : '');
+  // Mejor puntaje (solo exámenes aprobados; se guardó al terminar)
+  const mejor = leerMejor();
+  $('res-mejor').textContent = r.record ? '🏆 ¡Nuevo récord!' : (mejor ? `🏆 Mejor: ${mejor.puntaje} puntos en ${textoTiempo(mejor.tiempo)}` : '');
   actualizarBotonExamen();
   mostrarPantalla('resultado');
 }
 document.querySelectorAll('[data-inicio]').forEach((b) => b.addEventListener('click', () => {
   sonido.iniciar();
   if (b.dataset.inicio === 'examen') iniciarExamen();
-  else { mostrarPantalla(null); }
+  else { cancelarResultado(); mostrarPantalla(null); }
 }));
 document.querySelectorAll('[data-resultado]').forEach((b) => b.addEventListener('click', () => {
   if (b.dataset.resultado === 'repetir') iniciarExamen();
-  else mostrarPantalla(null);
+  else { cancelarResultado(); mostrarPantalla(null); }
 }));
 mostrarInicio();
 

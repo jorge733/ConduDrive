@@ -99,6 +99,19 @@ export class Examen {
     this._desliz = 0;
     this._lineas = new Map();  // distancia previa a cada línea (semáforo, PARE, CEDA)
     this._minVelPare = new Map();
+    this._luces = new Map();   // color anterior de cada semáforo (para detectar el amarillo)
+    this._puedeParar = new Map();
+    this._giroSemaforo = null;
+    this._sobreLinea = null;
+    this._peatonEnCalzada = 0;
+    this._avisoPeaton = false;
+    this._salidaParalelo = null;
+    this._frenada = 0;
+    this._retro = 0;
+    this._avisoRetro = null;
+    this._gesto = 0;
+    this.ui.extra.textContent = '';
+    this._marcaLugar.material.color.setHex(0xffd23f);
     this._rotonda = null;
     this._enCebra = false;
     this._retroceso = 0;
@@ -110,10 +123,10 @@ export class Examen {
 
   abandonar() {
     if (!this.activo) return;
-    this._terminar(false, 'Examen abandonado');
+    this._terminar(false, 'Examen abandonado', true);
   }
 
-  _terminar(completo, motivo = null) {
+  _terminar(completo, motivo = null, abandonado = false) {
     this.activo = false;
     this.terminado = true;
     this._ocultarMarcadores();
@@ -121,11 +134,14 @@ export class Examen {
     const eliminada = this.faltas.find((f) => f.tipo === 'eliminatoria');
     const aprobado = completo && !eliminada && this.puntaje >= PUNTAJE_APROBAR;
     const resultado = {
-      aprobado, completo, puntaje: Math.max(0, this.puntaje), tiempo: this.tiempo,
+      aprobado, completo, abandonado, puntaje: Math.max(0, this.puntaje), tiempo: this.tiempo,
       faltas: this.faltas.slice(),
       motivo: motivo || (eliminada ? eliminada.texto : (!aprobado ? `Puntaje menor a ${PUNTAJE_APROBAR}` : null))
     };
-    this._decir(aprobado ? '¡Felicitaciones! Aprobó el examen.' : 'Lo siento, no aprobó el examen esta vez.');
+    if (abandonado) { if (window.speechSynthesis) speechSynthesis.cancel(); }
+    else if (aprobado) this._decir('¡Felicitaciones! Aprobó el examen.');
+    else if (eliminada) this._decir(`Falta eliminatoria: ${eliminada.texto}. Detenga el vehículo. Lo siento, no aprobó el examen.`);
+    else this._decir('Lo siento, no aprobó el examen esta vez.');
     if (this.alTerminar) this.alTerminar(resultado);
   }
 
@@ -144,8 +160,7 @@ export class Examen {
     if (this.sonido) this.sonido.pitido();
     this._reaccionExaminador();
     if (tipo === 'eliminatoria') {
-      this._decir('Falta eliminatoria. ' + texto + '. Detenga el vehículo; el examen terminó.');
-      this._terminar(false, texto);
+      this._terminar(false, texto); // el examinador anuncia la falta al terminar
     } else if (tipo === 'grave') {
       this._decir(texto);
     }
@@ -250,7 +265,7 @@ export class Examen {
     this._revisarEtapa(dt);
     if (!this.activo) return;
     this._revisarSemaforoYSenales(dt);
-    this._revisarCebra();
+    this._revisarCebra(dt);
     this._revisarCruces();
     this._revisarRotonda(dt);
     this._revisarVelocidad(dt);
@@ -285,64 +300,108 @@ export class Examen {
 
   // ----- Semáforo, PARE y CEDA EL PASO: cruces de líneas -----
   _revisarSemaforoYSenales(dt) {
-    const a = this.auto, p = a.posicion;
+    const a = this.auto;
+    const sem = this.semaforo;
     // Semáforo (las 4 aproximaciones)
-    for (const ap of this.semaforo.aproximaciones) {
-      const cruzo = this._cruzoLinea('sem' + ap.d.x + ap.d.z, ap.linea, ap.d, ap.r);
-      if (!cruzo) continue;
-      const luz = this.semaforo.estado(ap.eje);
-      if (luz === 'rojo') this.falta('eliminatoria', 'Cruzó con luz roja');
-      else if (luz === 'amarillo' && this.semaforo.tiempo > 1.2 && a.kmh > 15) {
+    for (const ap of sem.aproximaciones) {
+      const clave = 'sem' + ap.d.x + ap.d.z;
+      const luz = sem.estado(ap.eje);
+      // Al encenderse el amarillo: ¿podía detenerse a tiempo? (1 s de reacción y frenada normal de 6 m/s²)
+      const prev = this._luces.get(clave);
+      this._luces.set(clave, luz);
+      if (luz === 'amarillo' && prev !== 'amarillo') {
+        const m = this._medirLinea(ap.linea, ap.d, ap.r, 1.9);
+        const v = Math.max(0, a.velocidadAvance);
+        this._puedeParar.set(clave, m.enCalle && m.s < 0 && -m.s > v * 1.0 + (v * v) / 12);
+      }
+      // El centro del auto entra al cruce con luz roja: eliminatoria
+      if (this._cruzoLinea(clave + 'c', ap.linea, ap.d, ap.r, 0) && luz === 'rojo') {
+        this.falta('eliminatoria', 'Cruzó con luz roja');
+      }
+      if (!this._cruzoLinea(clave, ap.linea, ap.d, ap.r, 1.9)) continue;
+      // El parachoques pasa la línea
+      if (luz === 'rojo') this._sobreLinea = { clave, t: this.tiempo };
+      else if (luz === 'amarillo' && this._puedeParar.get(clave)) {
         this.falta('leve', 'Cruzó con luz amarilla pudiendo detenerse', 'amarillo', 5);
       }
+      this._giroSemaforo = { d: ap.d, t: this.tiempo };
     }
+    // Pasó la línea con luz roja pero se detuvo antes de entrar al cruce: falta leve
+    if (this._sobreLinea && this.activo && this.auto.kmh < 0.5) {
+      this.falta('leve', 'Se detuvo sobre la línea de detención', 'sobreLinea', 10);
+      this._sobreLinea = null;
+    } else if (this._sobreLinea && this.tiempo - this._sobreLinea.t > 6) this._sobreLinea = null;
+    this._revisarViraIzquierdaSemaforo();
+
     // PARE (ambos sentidos del cruce 25,-25)
     for (const d of [{ x: 1, z: 0 }, { x: -1, z: 0 }]) {
       const r = { x: -d.z, z: d.x }, c = PUNTOS.pare;
       const linea = { x: c.x - d.x * 6.2 + r.x * 2.5, z: c.z - d.z * 6.2 + r.z * 2.5 };
       const clave = 'pare' + d.x;
-      // Mientras se acerca, guarda la velocidad mínima
-      const rx = p.x - linea.x, rz = p.z - linea.z;
-      const antes = rx * d.x + rz * d.z, lado = Math.abs(rx * r.x + rz * r.z);
-      if (antes > -14 && antes < 0.5 && lado < 3) {
+      // Debe detenerse con el frente cerca de la línea (en los últimos 5 m antes de ella)
+      const m = this._medirLinea(linea, d, r, 1.9);
+      const haciaAdelante = Math.sin(a.angulo) * d.x + Math.cos(a.angulo) * d.z > 0.5;
+      if (m.enCalle && haciaAdelante && m.s > -5 && m.s < 0.3) {
         this._minVelPare.set(clave, Math.min(this._minVelPare.get(clave) ?? 999, a.kmh));
-      } else if (antes < -16 || antes > 6) this._minVelPare.delete(clave);
-      // El frente del auto cruza la línea
+      } else if (!m.enCalle || m.s < -5 || m.s > 8) this._minVelPare.delete(clave);
       if (this._cruzoLinea(clave, linea, d, r, 1.9)) {
         if ((this._minVelPare.get(clave) ?? 999) > 1.5) this.falta('eliminatoria', 'No se detuvo en el disco PARE');
-        else this._revisarCeder(d, c, 'No cedió el paso después del PARE');
         this._minVelPare.delete(clave);
       }
+      // Después de la línea (y antes de entrar al cruce) debe ceder el paso
+      if (m.enCalle && haciaAdelante && m.s >= 0 && m.s < 3.5 && a.velocidadAvance > 1) {
+        this._revisarCeder(d, c, 'No cedió el paso después del PARE');
+      }
     }
+
     // CEDA EL PASO (cruce 75,-25, llegando por el oeste)
     {
       const d = { x: 1, z: 0 }, r = { x: 0, z: 1 }, c = PUNTOS.ceda;
       const linea = { x: c.x - 6.2, z: c.z + 2.5 };
-      if (this._cruzoLinea('ceda', linea, d, r, 1.9)) {
+      if (this._cruzoLinea('ceda', linea, d, r, 1.9) && a.kmh > 25) {
+        this.falta('leve', 'Llegó al CEDA EL PASO a velocidad excesiva', 'cedaVel', 10);
+      }
+      const m = this._medirLinea(linea, d, r, 1.9);
+      const haciaAdelante = Math.sin(a.angulo) > 0.5;
+      if (m.enCalle && haciaAdelante && m.s >= -0.5 && m.s < 3.5 && a.velocidadAvance > 1) {
         this._revisarCeder(d, c, 'No cedió el paso en el CEDA EL PASO');
-        if (a.kmh > 25) this.falta('leve', 'Llegó al CEDA EL PASO a velocidad excesiva', 'cedaVel', 10);
       }
     }
   }
 
   /**
-   * ¿El auto cruzó la línea en el sentido d este cuadro?
-   * "adelanto" = qué punto del auto se mide (1,9 = el parachoques delantero).
+   * Posición del auto respecto de una línea de detención.
+   * s = cuánto pasó la línea (negativo = antes); enCalle = está en la calzada de esa calle
+   * (cualquiera de las dos pistas, así no se puede "esquivar" la regla yendo por el centro).
    */
-  _cruzoLinea(clave, linea, d, r, adelanto = 0) {
+  _medirLinea(linea, d, r, adelanto = 0) {
     const a = this.auto;
     const fx = Math.sin(a.angulo), fz = Math.cos(a.angulo);
     const px = a.posicion.x + fx * adelanto, pz = a.posicion.z + fz * adelanto;
     const rx = px - linea.x, rz = pz - linea.z;
-    const s = rx * d.x + rz * d.z, lado = Math.abs(rx * r.x + rz * r.z);
-    const previo = this._lineas.get(clave);
-    this._lineas.set(clave, s);
-    return previo !== undefined && previo < 0 && s >= 0 && lado < 2.8 && a.velocidadAvance > 0;
+    const s = rx * d.x + rz * d.z;
+    const desdeCentro = rx * r.x + rz * r.z + 2.5; // la línea está en el centro de la pista derecha
+    return { s, enCalle: Math.abs(desdeCentro) < 5.5 };
   }
 
-  /** Si viene un auto hacia el cruce con preferencia y no lo dejamos pasar: falta grave */
+  /** ¿El frente del auto cruzó la línea en el sentido d este cuadro? */
+  _cruzoLinea(clave, linea, d, r, adelanto = 0) {
+    const a = this.auto;
+    const m = this._medirLinea(linea, d, r, adelanto);
+    const previo = this._lineas.get(clave);
+    this._lineas.set(clave, m.s);
+    const haciaAdelante = Math.sin(a.angulo) * d.x + Math.cos(a.angulo) * d.z > 0.5;
+    return previo !== undefined && previo < 0 && m.s >= 0 && m.enCalle && haciaAdelante && a.velocidadAvance > 0;
+  }
+
+  /**
+   * Si viene un auto con preferencia hacia el cruce y nos metemos: falta grave.
+   * Al virar a la derecha solo importan los que vienen por la izquierda
+   * (los que van por la pista a la que entramos).
+   */
   _revisarCeder(d, c, texto) {
-    if (this.auto.kmh < 3) return;
+    const izq = { x: d.z, z: -d.x }; // izquierda de la dirección d
+    const soloIzquierda = this.auto.intermitente === 'der' || this.auto.velocidadGiro > 0.15;
     for (const o of this.trafico.autos) {
       if (o.v < 1) continue;
       const ox = c.x - o.x, oz = c.z - o.z, dist = Math.hypot(ox, oz);
@@ -350,20 +409,53 @@ export class Examen {
       const fx = Math.sin(o.angulo), fz = Math.cos(o.angulo);
       const haciaCruce = (ox * fx + oz * fz) / dist > 0.6;
       const mismoSentido = fx * d.x + fz * d.z > 0.7; // va delante de nosotros: no tiene preferencia
-      if (haciaCruce && !mismoSentido) { this.falta('grave', texto, 'ceder', 6); return; }
+      const porIzquierda = (o.x - c.x) * izq.x + (o.z - c.z) * izq.z > 2;
+      if (haciaCruce && !mismoSentido && (!soloIzquierda || porIzquierda)) { this.falta('grave', texto, 'ceder', 6); return; }
+    }
+  }
+
+  /** Viraje a la izquierda en el semáforo: hay que dejar pasar a los que vienen de frente */
+  _revisarViraIzquierdaSemaforo() {
+    const g = this._giroSemaforo, a = this.auto, c = PUNTOS.semaforo;
+    if (!g || this.tiempo - g.t > 10) return;
+    const enCruce = Math.abs(a.posicion.x - c.x) < 6 && Math.abs(a.posicion.z - c.z) < 6;
+    const virandoIzq = a.velocidadGiro < -0.15; // el ángulo crece = viraje a la izquierda
+    if (!enCruce || !virandoIzq || a.velocidadAvance < 1) return;
+    for (const o of this.trafico.autos) {
+      if (o.v < 1) continue;
+      const fx = Math.sin(o.angulo), fz = Math.cos(o.angulo);
+      if (fx * g.d.x + fz * g.d.z > -0.7) continue; // solo los que vienen de frente
+      const ox = c.x - o.x, oz = c.z - o.z, dist = Math.hypot(ox, oz);
+      if (dist < 3 || dist > 18 || (ox * fx + oz * fz) / dist < 0.5) continue;
+      this.falta('grave', 'Viró a la izquierda sin ceder el paso a quien venía de frente', 'ceder', 6);
+      return;
     }
   }
 
   // ----- Paso de cebra -----
-  _revisarCebra() {
+  _revisarCebra(dt) {
     const a = this.auto, c = PUNTOS.cebra;
+    const g = this.peatones.cebra.p.grupo.position;
+    // ¿El peatón está en la calzada? (la calzada mide ±5 m desde el centro de la calle)
+    const enCalzada = this.peatones.cebraOcupada && Math.abs(g.z - c.z) < 5;
+    this._peatonEnCalzada = enCalzada ? (this._peatonEnCalzada || 0) + dt : 0;
     const fx = Math.sin(a.angulo), fz = Math.cos(a.angulo);
     const px = a.posicion.x + fx * 1.9, pz = a.posicion.z + fz * 1.9;
-    const dentro = Math.abs(px - c.x) < 2.3 && Math.abs(pz - c.z) < 5;
+    // Aviso del examinador cuando el peatón empieza a cruzar y el auto se acerca
+    const distCebra = Math.abs(px - c.x);
+    if (this.peatones.cebraOcupada && !this._avisoPeaton && distCebra < 35 && Math.abs(a.posicion.z - c.z) < 6 && a.kmh > 3) {
+      this._avisoPeaton = true;
+      this.alAvisar('🚶 ¡Peatón cruzando!', 1500);
+    }
+    if (!this.peatones.cebraOcupada) this._avisoPeaton = false;
+    const dentro = distCebra < 2.3 && Math.abs(pz - c.z) < 5;
     if (dentro && !this._enCebra) {
-      const g = this.peatones.cebra.p.grupo.position;
-      const peatonEnCalle = this.peatones.cebraOcupada && Math.abs(g.z - c.z) < 5.6;
-      if (peatonEnCalle) this.falta('eliminatoria', 'No respetó al peatón en el paso de cebra');
+      // Falta solo si el peatón ya estaba en la calzada con tiempo para frenar,
+      // o si está en la pista del auto (o a punto de entrar a ella)
+      const cerca = Math.abs(g.z - a.posicion.z) < 3.5;
+      if (enCalzada && (this._peatonEnCalzada > 1.2 || cerca)) {
+        this.falta('eliminatoria', 'No respetó al peatón en el paso de cebra');
+      }
     }
     this._enCebra = dentro;
   }
@@ -451,7 +543,7 @@ export class Examen {
       }
     }
     // izquierda > 0: el centro del auto pasó la línea central hacia la pista contraria
-    if (izquierda !== null && izquierda > 0.7) this._contraria += dt;
+    if (izquierda !== null && izquierda > 0.2) this._contraria += dt;
     else if (izquierda !== null && izquierda < 0) { this._contraria = 0; this._contrariaMarcada = false; } // volvió a su pista
     if (this._contraria > 1.5 && !this._contrariaMarcada) {
       this._contrariaMarcada = true;
@@ -464,9 +556,17 @@ export class Examen {
     const a = this.auto;
     this._desliz = a.deslizamiento > 0.6 && a.kmh > 15 ? this._desliz + dt : 0;
     if (this._desliz > 0.5) this.falta('grave', 'Perdió el control del vehículo (derrape)', 'desliz', 6);
-    if (a.aceleracionActual < -7.5 && a.kmh > 20) this.falta('leve', 'Frenada brusca', 'frenada', 8);
+    // Frenada brusca: desaceleración real fuerte y sostenida (un frenazo, no una frenada normal)
+    this._frenada = a.desaceleracion > 8 && a.kmh > 15 ? this._frenada + dt : 0;
+    if (this._frenada > 0.5) this.falta('leve', 'Frenada brusca', 'frenada', 8);
     if (a.frenando && a.freno < 0.05 && a.kmh > 10) this.falta('leve', 'Usó el freno de mano en movimiento', 'fmano', 8);
-    if (a.velocidadAvance < -2.8) this.falta('leve', 'Retrocedió a velocidad excesiva', 'retro', 8);
+    // Retroceso: primero un aviso; si sigue rápido (más de ~13 km/h por 1,5 s), falta leve
+    if (a.velocidadAvance < -3.0 && this.tiempo - (this._avisoRetro ?? -99) > 10) {
+      this._avisoRetro = this.tiempo;
+      this.alAvisar('⚠ Retroceda más despacio', 1500);
+    }
+    this._retro = a.velocidadAvance < -3.6 ? (this._retro || 0) + dt : 0;
+    if (this._retro > 1.5) this.falta('leve', 'Retrocedió a velocidad excesiva', 'retro', 8);
   }
 
   // ----- Salir del estacionamiento en paralelo señalizando a la izquierda -----

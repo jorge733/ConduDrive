@@ -15,12 +15,14 @@
 //   PARE en (25,-25) · CEDA EL PASO en (75,-25) · Rotonda en (25,25)
 //   Zona escolar en la calle Z=25 frente al colegio
 //   Estacionamiento en paralelo en la calle X=-25, junto a la plaza
+//   Barreras automáticas en la salida del estacionamiento
 // ===========================================================
 import * as THREE from 'three';
 import { CONFIG } from './config.js';
 import { Lote, GEO, matriz, texturaLetrero, aleatorio, anguloHacia, derechaDe } from './util.js';
 import { crearSenal, Semaforo } from './senales.js';
 import { agregarAutoALote, COLORES_AUTOS } from './vehiculos.js';
+import { Barreras } from './barreras.js';
 
 const { tamanoManzana: M, anchoCalle: A, anchoVereda: V, radioRotonda: RR, radioIsla: RI } = CONFIG.ciudad;
 const MEDIA = M / 2;
@@ -49,13 +51,14 @@ const COL = {
 };
 
 export function crearCiudad(escena) {
-  const mundo = { cajas: [], circulos: [], dinamicos: [] };
+  const mundo = { cajas: [], cajasDinamicas: [], circulos: [], dinamicos: [] };
   const solidos = new Lote();  // cosas que dan sombra (casas, postes, autos estacionados)
   const suelo = new Lote();    // veredas, pasto, líneas (solo reciben sombra)
   const lejos = new Lote();    // cordillera (sin sombras)
   const arboles = [];          // [x, z, escala]
   const faroles = [];          // [x, z, rotación]
   const rand = aleatorio(2024);
+  let barreras = null;
 
   // ---------- Suelo de asfalto ----------
   const piso = new THREE.Mesh(
@@ -305,7 +308,9 @@ export function crearCiudad(escena) {
       const x = -50 + k * 3.2;
       if (x < -33) autoEstacionado(x, -35, Math.PI);
     }
-    crearSenal(escena, solidos, ['estacionamiento'], -56.5, -31, 0, 1);
+    crearSenal(escena, solidos, ['estacionamiento'], -58, -31, 0, 1);
+    // Barreras automáticas en el hueco de salida (se abren al acercarse el auto)
+    barreras = new Barreras(escena, -55.4, -44.6, -31.3);
   }
 
   // ----- Bordes exteriores del pueblo -----
@@ -438,5 +443,5 @@ export function crearCiudad(escena) {
   escena.add(suelo.malla({ sombra: false, recibe: true }));
   escena.add(lejos.malla({ sombra: false, recibe: false }));
 
-  return { mundo, semaforo };
+  return { mundo, semaforo, barreras };
 }

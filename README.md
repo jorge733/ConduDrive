@@ -36,7 +36,7 @@ Luego abre <http://localhost:8000> en el navegador.
   (-50,-50) ESTACIONAM.  ( 0,-50) casas          (50,-50) casas
 ```
 
-- Partida: estacionamiento (abajo a la izquierda).
+- Partida: estacionamiento (abajo a la izquierda), con barreras que se levantan solas al acercarte.
 - Semáforo en el cruce (-25,-25) · Paso de cebra en (0,-25) · PARE en (25,-25)
 - CEDA EL PASO en (75,-25) · Rotonda en (25,25) · Zona escolar frente al colegio
 - Estacionamiento en paralelo junto a la plaza (calle X = -25)
@@ -63,6 +63,7 @@ Luego abre <http://localhost:8000> en el navegador.
 | `js/ciudad.js` | El pueblo: calles, casas, plaza, colegio, rotonda, señales |
 | `js/senales.js` | Señales de tránsito y semáforo |
 | `js/trafico.js` | Autos que circulan solos |
+| `js/barreras.js` | Barreras automáticas del estacionamiento |
 | `js/peatones.js` | Peatones (incluido el del paso de cebra) |
 | `js/personajes.js` | Modelos de personas: peatones, conductor y examinador |
 | `js/vehiculos.js` | Modelos simples de otros autos |

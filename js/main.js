@@ -51,7 +51,7 @@ const desfaseSol = new THREE.Vector3(30, 50, 20);
 const camara = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
 
 // ---------- Mundo, auto y controles ----------
-const { mundo, semaforo } = crearCiudad(escena);
+const { mundo, semaforo, barreras } = crearCiudad(escena);
 const auto = new Auto(escena);
 const interior = new Interior(auto);         // tablero, volante, examinador y espejos
 auto.posicion.set(PUNTOS.inicio.x, 0, PUNTOS.inicio.z); // en el estacionamiento
@@ -96,7 +96,7 @@ window.addEventListener('resize', alCambiarTamano);
 window.addEventListener('orientationchange', () => setTimeout(alCambiarTamano, 300));
 
 // Acceso para pruebas desde la consola del navegador
-window.ConduDrive = { renderer, escena, auto, semaforo, trafico, peatones };
+window.ConduDrive = { renderer, escena, auto, semaforo, trafico, peatones, barreras };
 
 // ---------- Bucle del juego ----------
 const reloj = new THREE.Clock();
@@ -112,6 +112,7 @@ function bucle() {
   semaforo.actualizar(dt);
   trafico.actualizar(dt, auto);
   peatones.actualizar(dt);
+  barreras.actualizar(dt, auto);
 
   // 2) Física del auto del jugador
   auto.actualizar(dt, controles);
@@ -120,13 +121,15 @@ function bucle() {
   mundo.dinamicos.length = 0;
   trafico.agregarColisiones(mundo.dinamicos);
   peatones.agregarColisiones(mundo.dinamicos);
+  mundo.cajasDinamicas.length = 0;
+  barreras.agregarColisiones(mundo.cajasDinamicas);
   const choque = resolverColisiones(auto, mundo);
   auto.grupo.position.copy(auto.posicion);
   const ahora = performance.now();
   if (choque && choque.tipo === 'peaton') peatones.atropellar();
   if (choque && (choque.fuerza > 2 || choque.tipo === 'peaton') && ahora - ultimoChoque > 800) {
     ultimoChoque = ahora;
-    const textos = { auto: '¡PUM! Chocaste un auto', peaton: '¡Atropellaste a alguien!', vereda: '¡Uy! Te subiste a la vereda' };
+    const textos = { auto: '¡PUM! Chocaste un auto', peaton: '¡Atropellaste a alguien!', vereda: '¡Uy! Te subiste a la vereda', barrera: '¡Chocaste la barrera!' };
     mostrarAviso(textos[choque.tipo] || '¡Choque!');
   }
 
